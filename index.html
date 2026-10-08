@@ -377,6 +377,7 @@
       <input type="file" id="fileImport" accept="application/json" class="visually-hidden">
       <button class="btn" id="btnExportCsv">📄 Exporter en CSV</button>
       <button class="btn" id="btnDriveConnect">☁ Connecter Google Drive</button>
+      <button class="btn visually-hidden" id="btnDriveSyncNow">🔄 Synchroniser maintenant</button>
     </div>
   </header>
 
@@ -632,13 +633,16 @@
 
   function updateDriveButtonUI() {
     var btn = document.getElementById("btnDriveConnect");
+    var syncBtn = document.getElementById("btnDriveSyncNow");
     if (!btn) return;
     if (driveAccessToken) {
       btn.textContent = "☁ Drive connecté";
       btn.classList.add("connected");
+      if (syncBtn) syncBtn.classList.remove("visually-hidden");
     } else {
       btn.textContent = "☁ Connecter Google Drive";
       btn.classList.remove("connected");
+      if (syncBtn) syncBtn.classList.add("visually-hidden");
     }
   }
 
@@ -720,8 +724,7 @@
       })
       .then(function () {
         driveSyncing = false;
-        setDriveStatus("☁ Synchronisé avec Google Drive.");
-        setTimeout(function () { if (!driveSyncing) setDriveStatus(""); }, 4000);
+        setDriveStatus("☁ Synchronisé avec Google Drive à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + ".");
       })
       .catch(function (err) {
         driveSyncing = false;
@@ -740,13 +743,32 @@
         .then(function (r) {
           if (r && r.ok) {
             setDriveStatus("☁ Enregistré sur Drive à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + ".");
-            setTimeout(function () { setDriveStatus(""); }, 4000);
           } else {
             setDriveStatus("☁ Échec de l'envoi vers Drive.", true);
           }
         })
         .catch(function () { setDriveStatus("☁ Échec de l'envoi vers Drive (hors ligne ?).", true); });
     }, 1500);
+  }
+
+  // Bouton "Synchroniser maintenant" : force l'envoi immédiat vers Drive,
+  // sans attendre le délai habituel, pour avoir une confirmation certaine.
+  function forceDriveSyncNow() {
+    if (!driveAccessToken || !driveFileId) {
+      setDriveStatus("☁ Connectez-vous d'abord à Google Drive.", true);
+      return;
+    }
+    if (driveUploadTimer) { clearTimeout(driveUploadTimer); driveUploadTimer = null; }
+    setDriveStatus("☁ Synchronisation en cours…");
+    driveUploadFile(driveFileId, JSON.stringify(state))
+      .then(function (r) {
+        if (r && r.ok) {
+          setDriveStatus("☁ Enregistré sur Drive à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + ".");
+        } else {
+          setDriveStatus("☁ Échec de l'envoi vers Drive.", true);
+        }
+      })
+      .catch(function () { setDriveStatus("☁ Échec de l'envoi vers Drive (hors ligne ?).", true); });
   }
 
   function onDriveTokenReceived(resp) {
@@ -839,6 +861,8 @@
       connectDrive();
     }
   });
+
+  document.getElementById("btnDriveSyncNow").addEventListener("click", forceDriveSyncNow);
 
   // ---------------------------------------------------------------------
   // Calculs métier
