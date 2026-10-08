@@ -259,6 +259,9 @@
   td.cell-name .btn.small.unlocked { background: var(--orange-bg); color: var(--orange); border-color: var(--orange); }
   table input[type="text"].cell-input:hover { border-color: var(--border); }
   table input[type="text"].cell-input:focus { border-color: var(--accent); background: var(--surface-2); outline: none; }
+  table input[type="text"].cell-input:read-only { cursor: default; opacity: 0.8; }
+  table input[type="text"].cell-input:read-only:hover, .extra-row input:read-only:hover { border-color: transparent; }
+  table select.cell-select:disabled { cursor: default; opacity: 0.8; }
   table select.cell-select {
     width: 100%; min-width: 130px; border: 1px solid transparent; background: transparent; color: var(--text);
     font-family: inherit; font-size: 13px; padding: 6px; border-radius: 6px; cursor: pointer;
@@ -1173,15 +1176,16 @@
   function extrasCellHtml(p) {
     var extras = p.extras || [];
     var isUnlocked = unlockedIds.has(p.id);
+    var lockAttr = isUnlocked ? "" : " readonly";
     var rows = extras.map(function (ex) {
       var removeBtn = isUnlocked
         ? '<button class="btn small danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette ligne">✕</button>'
         : "";
       return '<div class="extra-row" data-extra-row="' + ex.id + '">' +
-        '<div><span class="lbl">Nom</span><input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"></div>' +
-        '<div><span class="lbl">Poids suppl. (g)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="weight" value="' + escapeHtml(ex.weight || "") + '"></div>' +
-        '<div><span class="lbl">Temps suppl. (h)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="time" value="' + escapeHtml(ex.time || "") + '"></div>' +
-        '<div><span class="lbl">Coût pièce (€)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="cost" value="' + escapeHtml(ex.cost || "") + '"></div>' +
+        '<div><span class="lbl">Nom</span><input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"' + lockAttr + '></div>' +
+        '<div><span class="lbl">Poids suppl. (g)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="weight" value="' + escapeHtml(ex.weight || "") + '"' + lockAttr + '></div>' +
+        '<div><span class="lbl">Temps suppl. (h)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="time" value="' + escapeHtml(ex.time || "") + '"' + lockAttr + '></div>' +
+        '<div><span class="lbl">Coût pièce (€)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="cost" value="' + escapeHtml(ex.cost || "") + '"' + lockAttr + '></div>' +
         '<div><span class="lbl">&nbsp;</span>' + removeBtn + "</div>" +
         "</div>";
     }).join("");
@@ -1205,24 +1209,26 @@
   function rowHtml(p) {
     var c = computeRow(p);
     var html = "";
+    var isUnlocked = unlockedIds.has(p.id);
+    var lockAttr = isUnlocked ? "" : " readonly";
+    var lockAttrSelect = isUnlocked ? "" : " disabled";
 
     EDIT_FIELDS.forEach(function (f) {
       var isName = f.key === "name";
       var cls = (f.frozen ? "frozen-col " : "") + (f.type === "num" ? "num" : "") + (f.key === "platformId" ? " col-platform" : "") + (isName ? " cell-name" : " cell-detail");
       if (f.type === "select") {
-        html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '"><select class="cell-select" data-id="' + p.id + '" data-field="' + f.key + '">' + platformOptionsHtml(p.platformId) + "</select></td>";
+        html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '"><select class="cell-select" data-id="' + p.id + '" data-field="' + f.key + '"' + lockAttrSelect + '>' + platformOptionsHtml(p.platformId) + "</select></td>";
       } else {
         var inputCls = "cell-input tabular" + (isName ? " name-input" : "");
         var type = f.type === "num" ? "text" : "text";
         var inputmode = f.type === "num" ? ' inputmode="decimal"' : "";
-        var inputHtml = '<input type="' + type + '"' + inputmode + ' class="' + inputCls + '" data-id="' + p.id + '" data-field="' + f.key + '" value="' + escapeHtml(p[f.key] || "") + '">';
+        var inputHtml = '<input type="' + type + '"' + inputmode + ' class="' + inputCls + '" data-id="' + p.id + '" data-field="' + f.key + '" value="' + escapeHtml(p[f.key] || "") + '"' + lockAttr + '>';
         if (f.percentKey) {
           inputHtml = '<div class="input-with-pct">' + inputHtml + '<span class="cost-percent" id="pct_' + f.key + '_' + p.id + '">' + formatPercent(c[f.percentKey]) + "</span></div>";
         }
         if (isName) {
           var checkedAttr = selectedIds.has(p.id) ? " checked" : "";
-          var isUnlocked = unlockedIds.has(p.id);
-          var unlockBtn = '<button class="btn small' + (isUnlocked ? " unlocked" : "") + '" data-action="unlock" data-id="' + p.id + '" title="' + (isUnlocked ? "Verrouiller la suppression" : "Déverrouiller pour pouvoir supprimer") + '">' + (isUnlocked ? "🔓 Verrouiller" : "✏ Modifier") + "</button>";
+          var unlockBtn = '<button class="btn small' + (isUnlocked ? " unlocked" : "") + '" data-action="unlock" data-id="' + p.id + '" title="' + (isUnlocked ? "Verrouiller l\'édition" : "Déverrouiller pour modifier ou supprimer") + '">' + (isUnlocked ? "🔓 Verrouiller" : "✏ Modifier") + "</button>";
           inputHtml = '<input type="checkbox" class="row-select" data-id="' + p.id + '" aria-label="Sélectionner ce produit"' + checkedAttr + '>' +
             '<button class="row-toggle" data-action="toggle" data-id="' + p.id + '" aria-label="Afficher/masquer les détails" title="Afficher/masquer les détails">▾</button>' + inputHtml + unlockBtn;
         }
