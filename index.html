@@ -611,10 +611,11 @@
   // remplacement.
   // ---------------------------------------------------------------------
   var DRIVE_CLIENT_ID = "496863293272-79nmqcudg9rjs3mudld8qkovfo0osp1b.apps.googleusercontent.com";
-  var DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+  var DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file email";
   var DRIVE_FILENAME = "rentabilite-3d-data.json";
   var DRIVE_ENABLED_KEY = "impression3d_drive_enabled";
   var DRIVE_FILEID_KEY = "impression3d_drive_fileid";
+  var DRIVE_EMAIL_KEY = "impression3d_drive_email";
 
   var driveTokenClient = null;
   var driveAccessToken = null;
@@ -782,6 +783,21 @@
     updateDriveButtonUI();
     driveInitialSync();
     startDrivePolling();
+    fetchAndStoreDriveEmail();
+  }
+
+  // Mémorise l'adresse e-mail du compte connecté pour pouvoir la reproposer
+  // automatiquement (login_hint) lors des prochaines connexions, afin que
+  // Google saute l'écran de sélection de compte.
+  function fetchAndStoreDriveEmail() {
+    driveApiFetch("https://www.googleapis.com/oauth2/v3/userinfo")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (info) {
+        if (info && info.email) {
+          try { localStorage.setItem(DRIVE_EMAIL_KEY, info.email); } catch (e) {}
+        }
+      })
+      .catch(function () {});
   }
 
   // Vérifie périodiquement si une version plus récente existe sur Drive
@@ -817,20 +833,27 @@
     if (drivePollTimer) { clearInterval(drivePollTimer); drivePollTimer = null; }
   }
 
+  function getDriveTokenClient() {
+    if (!driveTokenClient) {
+      var savedEmail = localStorage.getItem(DRIVE_EMAIL_KEY) || "";
+      var config = {
+        client_id: DRIVE_CLIENT_ID,
+        scope: DRIVE_SCOPE,
+        callback: onDriveTokenReceived
+      };
+      if (savedEmail) config.hint = savedEmail;
+      driveTokenClient = google.accounts.oauth2.initTokenClient(config);
+    }
+    return driveTokenClient;
+  }
+
   function connectDrive() {
     if (!window.google || !google.accounts || !google.accounts.oauth2) {
       setDriveStatus("☁ Impossible de contacter Google (vérifiez votre connexion internet).", true);
       return;
     }
-    if (!driveTokenClient) {
-      driveTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: DRIVE_CLIENT_ID,
-        scope: DRIVE_SCOPE,
-        callback: onDriveTokenReceived
-      });
-    }
     var alreadyConsented = localStorage.getItem(DRIVE_ENABLED_KEY) === "1";
-    driveTokenClient.requestAccessToken({ prompt: alreadyConsented ? "" : "consent" });
+    getDriveTokenClient().requestAccessToken({ prompt: alreadyConsented ? "" : "consent" });
   }
 
   function disconnectDrive() {
@@ -839,19 +862,38 @@
     }
     driveAccessToken = null;
     stopDrivePolling();
-    try { localStorage.removeItem(DRIVE_ENABLED_KEY); } catch (e) {}
+    try {
+      localStorage.removeItem(DRIVE_ENABLED_KEY);
+      localStorage.removeItem(DRIVE_EMAIL_KEY);
+    } catch (e) {}
+    driveTokenClient = null;
     updateDriveButtonUI();
     setDriveStatus("☁ Déconnecté de Google Drive.");
     setTimeout(function () { setDriveStatus(""); }, 3000);
   }
 
-  // Ne reconnecte PAS automatiquement (ça ouvrait une fenêtre Google à
-  // chaque actualisation dès que plusieurs comptes Google existent dans le
-  // navigateur). On indique juste qu'un clic rétablira la synchro.
+  // Reconnexion automatique et silencieuse : grâce à l'adresse e-mail
+  // mémorisée (login_hint), Google sait directement quel compte utiliser
+  // et ne montre ni fenêtre ni sélecteur de compte, même s'il y a plusieurs
+  // comptes Google dans le navigateur.
   function tryAutoReconnectDrive() {
     var wantsDrive = localStorage.getItem(DRIVE_ENABLED_KEY) === "1";
     if (!wantsDrive) return;
-    setDriveStatus("☁ Cliquez sur « Connecter Google Drive » pour reprendre la synchro sur cette session.");
+    var waited = 0;
+    var waitForGis = setInterval(function () {
+      waited += 200;
+      if (window.google && google.accounts && google.accounts.oauth2) {
+        clearInterval(waitForGis);
+        try {
+          getDriveTokenClient().requestAccessToken({ prompt: "" });
+        } catch (e) {
+          console.warn("Reconnexion Drive silencieuse impossible", e);
+          setDriveStatus("☁ Cliquez sur « Connecter Google Drive » pour reprendre la synchro.");
+        }
+      } else if (waited > 6000) {
+        clearInterval(waitForGis);
+      }
+    }, 200);
   }
 
   document.getElementById("btnDriveConnect").addEventListener("click", function () {
