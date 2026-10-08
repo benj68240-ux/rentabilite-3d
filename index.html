@@ -255,6 +255,8 @@
   tr.row-collapsed td.cell-detail { display: none; }
   input.row-select { flex-shrink: 0; width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
   tr.row-selected { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 12px; }
+  td.cell-name .btn.small { flex-shrink: 0; white-space: nowrap; }
+  td.cell-name .btn.small.unlocked { background: var(--orange-bg); color: var(--orange); border-color: var(--orange); }
   table input[type="text"].cell-input:hover { border-color: var(--border); }
   table input[type="text"].cell-input:focus { border-color: var(--accent); background: var(--surface-2); outline: none; }
   table select.cell-select {
@@ -1168,13 +1170,17 @@
   // électricité de la ligne.
   function extrasCellHtml(p) {
     var extras = p.extras || [];
+    var isUnlocked = unlockedIds.has(p.id);
     var rows = extras.map(function (ex) {
+      var removeBtn = isUnlocked
+        ? '<button class="btn small danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette ligne">✕</button>'
+        : "";
       return '<div class="extra-row" data-extra-row="' + ex.id + '">' +
         '<div><span class="lbl">Nom</span><input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"></div>' +
         '<div><span class="lbl">Poids suppl. (g)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="weight" value="' + escapeHtml(ex.weight || "") + '"></div>' +
         '<div><span class="lbl">Temps suppl. (h)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="time" value="' + escapeHtml(ex.time || "") + '"></div>' +
         '<div><span class="lbl">Coût pièce (€)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="cost" value="' + escapeHtml(ex.cost || "") + '"></div>' +
-        '<div><span class="lbl">&nbsp;</span><button class="btn small danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette ligne">✕</button></div>' +
+        '<div><span class="lbl">&nbsp;</span>' + removeBtn + "</div>" +
         "</div>";
     }).join("");
     return '<td class="cell-detail cell-extras" data-label="Options / lignes suppl.">' +
@@ -1186,6 +1192,11 @@
   // Sélection de produits (transitoire, non sauvegardée) : permet de voir le
   // total de seulement quelques pièces choisies à la place du total général.
   var selectedIds = new Set();
+
+  // Verrouillage contre la suppression accidentelle (transitoire) : les
+  // croix rouges (supprimer le produit, supprimer une ligne d'option)
+  // restent cachées tant qu'on n'a pas cliqué sur « Modifier ».
+  var unlockedIds = new Set();
 
   function rowHtml(p) {
     var c = computeRow(p);
@@ -1206,8 +1217,10 @@
         }
         if (isName) {
           var checkedAttr = selectedIds.has(p.id) ? " checked" : "";
+          var isUnlocked = unlockedIds.has(p.id);
+          var unlockBtn = '<button class="btn small' + (isUnlocked ? " unlocked" : "") + '" data-action="unlock" data-id="' + p.id + '" title="' + (isUnlocked ? "Verrouiller la suppression" : "Déverrouiller pour pouvoir supprimer") + '">' + (isUnlocked ? "🔓 Verrouiller" : "✏ Modifier") + "</button>";
           inputHtml = '<input type="checkbox" class="row-select" data-id="' + p.id + '" aria-label="Sélectionner ce produit"' + checkedAttr + '>' +
-            '<button class="row-toggle" data-action="toggle" data-id="' + p.id + '" aria-label="Afficher/masquer les détails" title="Afficher/masquer les détails">▾</button>' + inputHtml;
+            '<button class="row-toggle" data-action="toggle" data-id="' + p.id + '" aria-label="Afficher/masquer les détails" title="Afficher/masquer les détails">▾</button>' + inputHtml + unlockBtn;
         }
         html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '">' + inputHtml + "</td>";
       }
@@ -1226,9 +1239,12 @@
       }
     });
 
+    var delBtn = unlockedIds.has(p.id)
+      ? '<button class="btn small danger" data-action="del" data-id="' + p.id + '" title="Supprimer">✕</button>'
+      : "";
     html += '<td class="cell-actions cell-detail" data-label="Actions"><div class="row-actions">' +
       '<button class="btn small" data-action="dup" data-id="' + p.id + '" title="Dupliquer">⧉</button>' +
-      '<button class="btn small danger" data-action="del" data-id="' + p.id + '" title="Supprimer">✕</button>' +
+      delBtn +
       "</div></td>";
 
     var trCls = (p.collapsed ? "row-collapsed " : "") + (selectedIds.has(p.id) ? "row-selected" : "");
@@ -1494,6 +1510,9 @@
       saveState();
       var tr = tbody.querySelector('tr[data-row-id="' + id + '"]');
       if (tr) tr.classList.toggle("row-collapsed", prod.collapsed);
+    } else if (action === "unlock") {
+      if (unlockedIds.has(id)) unlockedIds.delete(id); else unlockedIds.add(id);
+      renderBody();
     } else if (action === "addExtra") {
       var extraProd = state.products.filter(function (x) { return x.id === id; })[0];
       if (!extraProd) return;
