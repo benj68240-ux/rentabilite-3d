@@ -1306,7 +1306,6 @@
     var list = isSelection ? state.products.filter(function (p) { return selectedIds.has(p.id); }) : state.products;
     var n = list.length;
     var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, netMargin: 0, packaging: 0, accessories: 0 };
-    var marginPercentSum = 0, marginPercentCount = 0;
 
     list.forEach(function (p) {
       var c = computeRow(p);
@@ -1320,10 +1319,12 @@
       sums.netMargin += c.netMargin;
       sums.packaging += parseNum(p.packaging);
       sums.accessories += parseNum(p.accessories);
-      if (c.netMarginPercent !== null) { marginPercentSum += c.netMarginPercent; marginPercentCount++; }
     });
 
-    var avgMarginPercent = marginPercentCount > 0 ? marginPercentSum / marginPercentCount : null;
+    // Marge % globale = somme des marges € ÷ somme des prix € (et non une
+    // moyenne des % individuels) : un article offert à 0 € doit faire
+    // baisser le % global au lieu d'être ignoré du calcul.
+    var avgMarginPercent = sums.price > 0 ? (sums.netMargin / sums.price * 100) : null;
     function sumPct(v) { return sums.totalCost > 0 ? (v / sums.totalCost * 100) : null; }
 
     var totalLabel = isSelection ? "Sélection" : "Total";
