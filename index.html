@@ -253,6 +253,8 @@
   .row-toggle:hover { background: var(--surface-2); color: var(--text); }
   tr.row-collapsed .row-toggle { transform: rotate(-90deg); }
   tr.row-collapsed td.cell-detail { display: none; }
+  input.row-select { flex-shrink: 0; width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+  tr.row-selected { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 12px; }
   table input[type="text"].cell-input:hover { border-color: var(--border); }
   table input[type="text"].cell-input:focus { border-color: var(--accent); background: var(--surface-2); outline: none; }
   table select.cell-select {
@@ -1181,6 +1183,10 @@
       "</div></td>";
   }
 
+  // Sélection de produits (transitoire, non sauvegardée) : permet de voir le
+  // total de seulement quelques pièces choisies à la place du total général.
+  var selectedIds = new Set();
+
   function rowHtml(p) {
     var c = computeRow(p);
     var html = "";
@@ -1199,7 +1205,9 @@
           inputHtml = '<div class="input-with-pct">' + inputHtml + '<span class="cost-percent" id="pct_' + f.key + '_' + p.id + '">' + formatPercent(c[f.percentKey]) + "</span></div>";
         }
         if (isName) {
-          inputHtml = '<button class="row-toggle" data-action="toggle" data-id="' + p.id + '" aria-label="Afficher/masquer les détails" title="Afficher/masquer les détails">▾</button>' + inputHtml;
+          var checkedAttr = selectedIds.has(p.id) ? " checked" : "";
+          inputHtml = '<input type="checkbox" class="row-select" data-id="' + p.id + '" aria-label="Sélectionner ce produit"' + checkedAttr + '>' +
+            '<button class="row-toggle" data-action="toggle" data-id="' + p.id + '" aria-label="Afficher/masquer les détails" title="Afficher/masquer les détails">▾</button>' + inputHtml;
         }
         html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '">' + inputHtml + "</td>";
       }
@@ -1223,7 +1231,8 @@
       '<button class="btn small danger" data-action="del" data-id="' + p.id + '" title="Supprimer">✕</button>' +
       "</div></td>";
 
-    return '<tr data-row-id="' + p.id + '" class="' + (p.collapsed ? "row-collapsed" : "") + '">' + html + "</tr>";
+    var trCls = (p.collapsed ? "row-collapsed " : "") + (selectedIds.has(p.id) ? "row-selected" : "");
+    return '<tr data-row-id="' + p.id + '" class="' + trCls + '">' + html + "</tr>";
   }
 
   function costCellContent(f, c) {
@@ -1273,7 +1282,8 @@
 
   function updateTotals() {
     var row = document.getElementById("totalsRow");
-    var list = state.products;
+    var isSelection = selectedIds.size > 0;
+    var list = isSelection ? state.products.filter(function (p) { return selectedIds.has(p.id); }) : state.products;
     var n = list.length;
     var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, netMargin: 0, packaging: 0, accessories: 0 };
     var marginPercentSum = 0, marginPercentCount = 0;
@@ -1296,7 +1306,9 @@
     var avgMarginPercent = marginPercentCount > 0 ? marginPercentSum / marginPercentCount : null;
     function sumPct(v) { return sums.totalCost > 0 ? (v / sums.totalCost * 100) : null; }
 
-    var html = '<td class="frozen-col cell-name" data-label="Total"><button class="row-toggle" id="totalsToggle" aria-label="Afficher/masquer le détail du total" title="Afficher/masquer le détail du total">▾</button>Total <span class="cost-percent">(' + n + " produit" + (n > 1 ? "s" : "") + ')</span></td>';
+    var totalLabel = isSelection ? "Sélection" : "Total";
+    var clearBtn = isSelection ? ' <button class="btn small" id="totalsClearSelection" title="Revenir au total de tous les produits">✕ Effacer la sélection</button>' : "";
+    var html = '<td class="frozen-col cell-name" data-label="Total"><button class="row-toggle" id="totalsToggle" aria-label="Afficher/masquer le détail du total" title="Afficher/masquer le détail du total">▾</button>' + totalLabel + ' <span class="cost-percent">(' + n + " produit" + (n > 1 ? "s" : "") + ')</span>' + clearBtn + '</td>';
     html += '<td class="num tabular cell-detail" data-label="Prix vente TTC (€)">' + formatCurrency(sums.price) + "</td>";
     html += '<td class="cell-detail"></td><td class="cell-detail"></td><td class="cell-detail"></td><td class="cell-detail"></td>'; // poids, filament, temps, mo(min)
     html += '<td class="num tabular cell-detail" data-label="Packaging (€)">' + formatCurrency(sums.packaging) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.packaging)) + "</span></td>";
@@ -1401,6 +1413,11 @@
   var tbody = document.getElementById("tbody");
 
   document.getElementById("totalsFoot").addEventListener("click", function (e) {
+    if (e.target.closest("#totalsClearSelection")) {
+      selectedIds.clear();
+      renderBody();
+      return;
+    }
     if (!e.target.closest("#totalsToggle")) return;
     state.totalsCollapsed = !state.totalsCollapsed;
     saveState();
@@ -1441,6 +1458,12 @@
       p.platformId = target.value;
       saveState();
       updateRowComputed(id);
+      updateTotals();
+    } else if (target.matches("input.row-select")) {
+      var selId = target.getAttribute("data-id");
+      if (target.checked) selectedIds.add(selId); else selectedIds.delete(selId);
+      var tr = tbody.querySelector('tr[data-row-id="' + selId + '"]');
+      if (tr) tr.classList.toggle("row-selected", target.checked);
       updateTotals();
     }
   });
