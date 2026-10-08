@@ -692,7 +692,7 @@
   function driveInitialSync() {
     setDriveStatus("☁ Synchronisation…");
     driveSyncing = true;
-    (driveFileId ? Promise.resolve(driveFileId) : driveFindFile())
+    driveFindFile()
       .then(function (foundId) {
         if (foundId) {
           driveFileId = foundId;
