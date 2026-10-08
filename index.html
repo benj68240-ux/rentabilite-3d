@@ -190,7 +190,7 @@
   .cell-extras::before { content: none; }
   .extras-box { width: 100%; max-width: 640px; }
   .extras-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-soft); margin-bottom: 8px; }
-  .extra-row { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr auto; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .extra-row { display: grid; grid-template-columns: 1.2fr 0.7fr 0.7fr 0.7fr auto; gap: 10px; align-items: center; margin-bottom: 8px; }
   .extra-row > div { min-width: 0; }
   .extra-row input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 13.5px; color: var(--text); font-family: inherit; width: 100%; box-sizing: border-box; }
   .extra-row .lbl { font-size: 11px; color: var(--text-soft); margin-bottom: 3px; display: block; }
@@ -937,10 +937,11 @@
     var packaging = parseNum(p.packaging);
     var accessories = parseNum(p.accessories);
 
-    var extrasWeight = 0, extrasTime = 0;
+    var extrasWeight = 0, extrasTime = 0, extrasCost = 0;
     (p.extras || []).forEach(function (ex) {
       extrasWeight += parseNum(ex.weight);
       extrasTime += parseNum(ex.time);
+      extrasCost += parseNum(ex.cost);
     });
     var totalWeight = weight + extrasWeight;
     var totalPrintTime = printTime + extrasTime;
@@ -965,7 +966,7 @@
 
     var laborCost = (laborTime / 60) * parseNum(s.laborRate);
 
-    var totalCost = materialCost + energyCost + platformCost + socialCost + laborCost + packaging + accessories;
+    var totalCost = materialCost + energyCost + platformCost + socialCost + laborCost + packaging + accessories + extrasCost;
 
     function pctOfTotal(v) { return totalCost > 0 ? (v / totalCost * 100) : null; }
     var materialCostPercent = pctOfTotal(materialCost);
@@ -979,7 +980,7 @@
     var netMargin = price - totalCost;
     var netMarginPercent = price > 0 ? (netMargin / price * 100) : null;
 
-    var fixedCosts = materialCost + energyCost + laborCost + packaging + accessories;
+    var fixedCosts = materialCost + energyCost + laborCost + packaging + accessories + extrasCost;
     var targetMargin = parseNum(s.targetMargin);
     var denom = 1 - platformPercent / 100 - socialRate / 100 - targetMargin / 100;
     var minPrice = denom > 0 ? (fixedCosts + platformFixed) / denom : null;
@@ -1170,6 +1171,7 @@
         '<div><span class="lbl">Nom</span><input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"></div>' +
         '<div><span class="lbl">Poids suppl. (g)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="weight" value="' + escapeHtml(ex.weight || "") + '"></div>' +
         '<div><span class="lbl">Temps suppl. (h)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="time" value="' + escapeHtml(ex.time || "") + '"></div>' +
+        '<div><span class="lbl">Coût pièce (€)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="cost" value="' + escapeHtml(ex.cost || "") + '"></div>' +
         '<div><span class="lbl">&nbsp;</span><button class="btn small danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette ligne">✕</button></div>' +
         "</div>";
     }).join("");
@@ -1473,7 +1475,7 @@
       var extraProd = state.products.filter(function (x) { return x.id === id; })[0];
       if (!extraProd) return;
       if (!extraProd.extras) extraProd.extras = [];
-      extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0" });
+      extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0", cost: "0" });
       saveState();
       renderBody();
     } else if (action === "removeExtra") {
