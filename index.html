@@ -700,17 +700,15 @@
           return driveDownloadFile(foundId).then(function (text) {
             var remote = null;
             try { remote = text ? JSON.parse(text) : null; } catch (e) { remote = null; }
-            var localTime = state.savedAt ? new Date(state.savedAt).getTime() : 0;
-            var remoteTime = remote && remote.savedAt ? new Date(remote.savedAt).getTime() : 0;
-            if (remote && remoteTime > localTime) {
+            // La connexion récupère TOUJOURS la version Drive en priorité :
+            // elle ne doit jamais écraser silencieusement le cloud avec une
+            // version locale simplement parce qu'on vient de cliquer "Connecter".
+            if (remote) {
               state = remote;
               try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
               renderHead();
               renderSettingsInputs();
               renderBody();
-              setDriveStatus("☁ Données plus récentes trouvées sur Drive — chargées.");
-            } else {
-              return driveUploadFile(foundId, JSON.stringify(state));
             }
           });
         } else {
