@@ -186,6 +186,18 @@
   .platform-row input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 13.5px; color: var(--text); font-family: inherit; width: 100%; box-sizing: border-box; }
   .platform-row .lbl { font-size: 11px; color: var(--text-soft); margin-bottom: 3px; display: block; }
 
+  .cell-extras { display: block; text-align: left; }
+  .cell-extras::before { content: none; }
+  .extras-box { width: 100%; max-width: 640px; }
+  .extras-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-soft); margin-bottom: 8px; }
+  .extra-row { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr auto; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .extra-row > div { min-width: 0; }
+  .extra-row input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 13.5px; color: var(--text); font-family: inherit; width: 100%; box-sizing: border-box; }
+  .extra-row .lbl { font-size: 11px; color: var(--text-soft); margin-bottom: 3px; display: block; }
+  @media (max-width: 680px) {
+    .extra-row { grid-template-columns: 1fr 1fr; }
+  }
+
   .table-wrap {
     background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
     box-shadow: var(--shadow); overflow: auto; max-height: 72vh; position: relative;
@@ -925,13 +937,21 @@
     var packaging = parseNum(p.packaging);
     var accessories = parseNum(p.accessories);
 
+    var extrasWeight = 0, extrasTime = 0;
+    (p.extras || []).forEach(function (ex) {
+      extrasWeight += parseNum(ex.weight);
+      extrasTime += parseNum(ex.time);
+    });
+    var totalWeight = weight + extrasWeight;
+    var totalPrintTime = printTime + extrasTime;
+
     var failureMult = 1 + parseNum(s.failureRate) / 100;
 
-    var materialCost = (weight / 1000 * filamentPrice) * failureMult;
+    var materialCost = (totalWeight / 1000 * filamentPrice) * failureMult;
 
     var printerLifetime = parseNum(s.printerLifetime);
     var amortization = printerLifetime > 0 ? parseNum(s.printerPrice) / printerLifetime : 0;
-    var energyCost = printTime * ((parseNum(s.printerPower) / 1000) * parseNum(s.kwhPrice) + amortization) * failureMult;
+    var energyCost = totalPrintTime * ((parseNum(s.printerPower) / 1000) * parseNum(s.kwhPrice) + amortization) * failureMult;
 
     var isPerso = state.saleMode === "perso";
 
@@ -1140,6 +1160,25 @@
     return arr;
   }
 
+  // Lignes d'options personnalisables par produit (ex: "Suspension" = +58g,
+  // +1h47) : leur poids et temps s'ajoutent au calcul du coût matière et
+  // électricité de la ligne.
+  function extrasCellHtml(p) {
+    var extras = p.extras || [];
+    var rows = extras.map(function (ex) {
+      return '<div class="extra-row" data-extra-row="' + ex.id + '">' +
+        '<div><span class="lbl">Nom</span><input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"></div>' +
+        '<div><span class="lbl">Poids suppl. (g)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="weight" value="' + escapeHtml(ex.weight || "") + '"></div>' +
+        '<div><span class="lbl">Temps suppl. (h)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="time" value="' + escapeHtml(ex.time || "") + '"></div>' +
+        '<div><span class="lbl">&nbsp;</span><button class="btn small danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette ligne">✕</button></div>' +
+        "</div>";
+    }).join("");
+    return '<td class="cell-detail cell-extras" data-label="Options / lignes suppl.">' +
+      '<div class="extras-box"><div class="extras-title">Options / lignes supplémentaires</div>' + rows +
+      '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button>' +
+      "</div></td>";
+  }
+
   function rowHtml(p) {
     var c = computeRow(p);
     var html = "";
@@ -1163,6 +1202,8 @@
         html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '">' + inputHtml + "</td>";
       }
     });
+
+    html += extrasCellHtml(p);
 
     COMPUTED_FIELDS.forEach(function (f) {
       var val = c[f.key];
@@ -1375,6 +1416,17 @@
       saveState();
       updateRowComputed(id);
       updateTotals();
+    } else if (target.matches("[data-extra-field]")) {
+      var exId = target.getAttribute("data-id");
+      var exProd = state.products.filter(function (x) { return x.id === exId; })[0];
+      if (!exProd) return;
+      var extraId = target.getAttribute("data-extra-id");
+      var extra = (exProd.extras || []).filter(function (x) { return x.id === extraId; })[0];
+      if (!extra) return;
+      extra[target.getAttribute("data-extra-field")] = target.value;
+      saveState();
+      updateRowComputed(exId);
+      updateTotals();
     }
   });
 
@@ -1399,7 +1451,8 @@
     if (action === "dup") {
       var p = state.products.filter(function (x) { return x.id === id; })[0];
       if (!p) return;
-      var copy = Object.assign({}, p, { id: uid("prod"), name: p.name + " (copie)" });
+      var copiedExtras = (p.extras || []).map(function (ex) { return Object.assign({}, ex, { id: uid("extra") }); });
+      var copy = Object.assign({}, p, { id: uid("prod"), name: p.name + " (copie)", extras: copiedExtras });
       var idx = state.products.indexOf(p);
       state.products.splice(idx + 1, 0, copy);
       saveState();
@@ -1416,6 +1469,20 @@
       saveState();
       var tr = tbody.querySelector('tr[data-row-id="' + id + '"]');
       if (tr) tr.classList.toggle("row-collapsed", prod.collapsed);
+    } else if (action === "addExtra") {
+      var extraProd = state.products.filter(function (x) { return x.id === id; })[0];
+      if (!extraProd) return;
+      if (!extraProd.extras) extraProd.extras = [];
+      extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0" });
+      saveState();
+      renderBody();
+    } else if (action === "removeExtra") {
+      var rmProd = state.products.filter(function (x) { return x.id === id; })[0];
+      if (!rmProd) return;
+      var rmExtraId = btn.getAttribute("data-extra-id");
+      rmProd.extras = (rmProd.extras || []).filter(function (x) { return x.id !== rmExtraId; });
+      saveState();
+      renderBody();
     }
   });
 
@@ -1423,7 +1490,7 @@
     state.products.push({
       id: uid("prod"), name: "Nouveau produit", price: "0", weight: "0", filamentPrice: "0",
       printTime: "0", laborTime: "0", packaging: "0", accessories: "0",
-      platformId: state.settings.platforms[0].id
+      platformId: state.settings.platforms[0].id, extras: []
     });
     saveState();
     renderBody();
