@@ -809,7 +809,8 @@
         callback: onDriveTokenReceived
       });
     }
-    driveTokenClient.requestAccessToken({ prompt: driveAccessToken ? "" : "consent" });
+    var alreadyConsented = localStorage.getItem(DRIVE_ENABLED_KEY) === "1";
+    driveTokenClient.requestAccessToken({ prompt: alreadyConsented ? "" : "consent" });
   }
 
   function disconnectDrive() {
@@ -824,28 +825,13 @@
     setTimeout(function () { setDriveStatus(""); }, 3000);
   }
 
+  // Ne reconnecte PAS automatiquement (ça ouvrait une fenêtre Google à
+  // chaque actualisation dès que plusieurs comptes Google existent dans le
+  // navigateur). On indique juste qu'un clic rétablira la synchro.
   function tryAutoReconnectDrive() {
     var wantsDrive = localStorage.getItem(DRIVE_ENABLED_KEY) === "1";
     if (!wantsDrive) return;
-    var waited = 0;
-    var waitForGis = setInterval(function () {
-      waited += 200;
-      if (window.google && google.accounts && google.accounts.oauth2) {
-        clearInterval(waitForGis);
-        driveTokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: DRIVE_CLIENT_ID,
-          scope: DRIVE_SCOPE,
-          callback: onDriveTokenReceived
-        });
-        try {
-          driveTokenClient.requestAccessToken({ prompt: "" });
-        } catch (e) {
-          console.warn("Reconnexion Drive silencieuse impossible", e);
-        }
-      } else if (waited > 6000) {
-        clearInterval(waitForGis);
-      }
-    }, 200);
+    setDriveStatus("☁ Cliquez sur « Connecter Google Drive » pour reprendre la synchro sur cette session.");
   }
 
   document.getElementById("btnDriveConnect").addEventListener("click", function () {
