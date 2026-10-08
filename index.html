@@ -1185,9 +1185,11 @@
         '<div><span class="lbl">&nbsp;</span>' + removeBtn + "</div>" +
         "</div>";
     }).join("");
+    var addBtn = isUnlocked
+      ? '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button>'
+      : "";
     return '<td class="cell-detail cell-extras" data-label="Options / lignes suppl.">' +
-      '<div class="extras-box"><div class="extras-title">Options / lignes supplémentaires</div>' + rows +
-      '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button>' +
+      '<div class="extras-box"><div class="extras-title">Options / lignes supplémentaires</div>' + rows + addBtn +
       "</div></td>";
   }
 
