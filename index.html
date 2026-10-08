@@ -558,7 +558,8 @@
       ],
       sort: { key: null, dir: 1 },
       saleMode: "pro",
-      totalsCollapsed: true
+      totalsCollapsed: true,
+      settingsPanelOpen: true
     };
   }
 
@@ -573,6 +574,7 @@
       if (!parsed.sort) parsed.sort = { key: null, dir: 1 };
       if (parsed.saleMode !== "pro" && parsed.saleMode !== "perso") parsed.saleMode = "pro";
       if (typeof parsed.totalsCollapsed !== "boolean") parsed.totalsCollapsed = true;
+      if (typeof parsed.settingsPanelOpen !== "boolean") parsed.settingsPanelOpen = true;
       if (!Array.isArray(parsed.settings.platforms) || parsed.settings.platforms.length === 0) {
         parsed.settings.platforms = defaultState().settings.platforms;
       }
@@ -1361,6 +1363,8 @@
     });
     updateAmortDisplay();
     renderPlatformsSettings();
+    var panel = document.getElementById("settingsPanel");
+    if (panel) panel.open = !!state.settingsPanelOpen;
   }
 
   function renderPlatformsSettings() {
@@ -1406,6 +1410,11 @@
       });
     });
   }
+
+  document.getElementById("settingsPanel").addEventListener("toggle", function (e) {
+    state.settingsPanelOpen = e.target.open;
+    saveState();
+  });
 
   document.getElementById("btnAddPlatform").addEventListener("click", function () {
     state.settings.platforms.push({ id: uid("plat"), name: "Nouveau profil", percent: "0", fixed: "0" });
