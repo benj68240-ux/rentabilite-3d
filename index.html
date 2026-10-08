@@ -761,6 +761,40 @@
     try { localStorage.setItem(DRIVE_ENABLED_KEY, "1"); } catch (e) {}
     updateDriveButtonUI();
     driveInitialSync();
+    startDrivePolling();
+  }
+
+  // Vérifie périodiquement si une version plus récente existe sur Drive
+  // (mise à jour depuis un autre appareil) et la charge si besoin, sans
+  // avoir à recharger la page.
+  var drivePollTimer = null;
+
+  function drivePollForUpdates() {
+    if (!driveAccessToken || !driveFileId || driveSyncing) return;
+    driveDownloadFile(driveFileId).then(function (text) {
+      var remote = null;
+      try { remote = text ? JSON.parse(text) : null; } catch (e) { remote = null; }
+      var localTime = state.savedAt ? new Date(state.savedAt).getTime() : 0;
+      var remoteTime = remote && remote.savedAt ? new Date(remote.savedAt).getTime() : 0;
+      if (remote && remoteTime > localTime) {
+        state = remote;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+        renderHead();
+        renderSettingsInputs();
+        renderBody();
+        setDriveStatus("☁ Mise à jour reçue depuis un autre appareil.");
+        setTimeout(function () { setDriveStatus(""); }, 4000);
+      }
+    }).catch(function () { /* silencieux, on retentera au prochain cycle */ });
+  }
+
+  function startDrivePolling() {
+    stopDrivePolling();
+    drivePollTimer = setInterval(drivePollForUpdates, 45000);
+  }
+
+  function stopDrivePolling() {
+    if (drivePollTimer) { clearInterval(drivePollTimer); drivePollTimer = null; }
   }
 
   function connectDrive() {
@@ -783,6 +817,7 @@
       google.accounts.oauth2.revoke(driveAccessToken, function () {});
     }
     driveAccessToken = null;
+    stopDrivePolling();
     try { localStorage.removeItem(DRIVE_ENABLED_KEY); } catch (e) {}
     updateDriveButtonUI();
     setDriveStatus("☁ Déconnecté de Google Drive.");
