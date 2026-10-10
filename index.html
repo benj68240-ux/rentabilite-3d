@@ -369,6 +369,14 @@
     max-width: 640px;
   }
   #totalsRow td { position: static; background: transparent; }
+  #discountRow {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 4px 14px;
+    max-width: 640px; margin-top: 10px;
+  }
+  #discountRow td { position: static; background: transparent; }
+  #discountRow label { display: flex; align-items: center; justify-content: flex-end; gap: 8px; width: 100%; font-weight: 600; }
+  #discountRow input#discountPercent { width: 64px; flex: 0 0 auto; text-align: right; }
+  #discountImpact.impact-negative { color: var(--red); font-weight: 600; }
 
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
@@ -476,6 +484,17 @@
       <tbody id="tbody"></tbody>
       <tfoot id="totalsFoot">
         <tr id="totalsRow"></tr>
+        <tr id="discountRow" class="discount-row">
+          <td class="frozen-col cell-name" data-label="Simulation réduction">
+            <label for="discountPercent">Réduction (%)
+              <input type="text" inputmode="decimal" id="discountPercent" class="cell-input tabular" placeholder="0" value="">
+            </label>
+          </td>
+          <td class="num tabular" data-label="Prix après réduction (€)" id="discountPrice">—</td>
+          <td class="num tabular" data-label="Marge nette après réduction (€)" id="discountMargin">—</td>
+          <td class="num tabular" data-label="Marge nette après réduction (%)" id="discountMarginPercent">—</td>
+          <td class="num tabular" data-label="Impact sur la marge (€)" id="discountImpact">—</td>
+        </tr>
       </tfoot>
     </table>
   </div>
@@ -1352,6 +1371,29 @@
     html += '<td class="cell-detail"></td><td class="cell-detail"></td>';
     row.innerHTML = html;
     row.classList.toggle("row-collapsed", !!state.totalsCollapsed);
+    updateDiscountRow(sums.price, sums.totalCost, sums.netMargin);
+  }
+
+  // Simulation d'une réduction (%) appliquée au prix de vente du Total (ou
+  // de la Sélection) : ne modifie aucune donnée produit, affiche juste
+  // l'impact sur la marge nette restante.
+  function updateDiscountRow(price, totalCost, netMargin) {
+    var input = document.getElementById("discountPercent");
+    var pct = input ? parseNum(input.value) : 0;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+
+    var discountedPrice = price * (1 - pct / 100);
+    var discountedMargin = discountedPrice - totalCost;
+    var discountedMarginPercent = discountedPrice > 0 ? (discountedMargin / discountedPrice * 100) : null;
+    var impact = discountedMargin - netMargin;
+
+    document.getElementById("discountPrice").textContent = formatCurrency(discountedPrice);
+    document.getElementById("discountMargin").textContent = formatCurrency(discountedMargin);
+    document.getElementById("discountMarginPercent").innerHTML = '<span class="margin-cell ' + marginClass(discountedMarginPercent) + '">' + formatPercent(discountedMarginPercent) + "</span>";
+    var impactEl = document.getElementById("discountImpact");
+    impactEl.textContent = (impact > 0 ? "+" : "") + formatCurrency(impact);
+    impactEl.classList.toggle("impact-negative", impact < 0);
   }
 
   // ---------------------------------------------------------------------
@@ -1439,6 +1481,12 @@
       saveState();
       recomputeAllRows();
     });
+  });
+
+  // Simulation de réduction (%) sur le Total / la Sélection (transitoire,
+  // non sauvegardée, ne modifie aucun produit).
+  document.getElementById("discountPercent").addEventListener("input", function () {
+    updateTotals();
   });
 
   // ---------------------------------------------------------------------
