@@ -170,6 +170,8 @@
   .btn.primary:hover { filter: brightness(1.06); box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 5px 16px -2px color-mix(in srgb, var(--accent) 55%, transparent); }
   .btn.primary:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
   .btn.danger { color: var(--red); }
+  .btn.success { color: var(--green); border-color: var(--green); }
+  .btn.success:hover { background: var(--green-bg); }
   .btn.small { padding: 4px 9px; font-size: 12px; border-radius: 6px; }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .btn:disabled:active { transform: none; }
@@ -215,6 +217,36 @@
   .platform-row > div { min-width: 0; }
   .platform-row input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 13.5px; color: var(--text); font-family: inherit; width: 100%; box-sizing: border-box; }
   .platform-row .lbl { font-size: 11px; color: var(--text-soft); margin-bottom: 3px; display: block; }
+
+  .sales-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-top: 18px; margin-bottom: 18px;
+  }
+  .stat-tile {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat-label { font-size: 11px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
+  .stat-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-value.stat-positive { color: var(--green); }
+  .stat-value.stat-negative { color: var(--red); }
+
+  .sales-empty { color: var(--text-soft); font-size: 13.5px; padding: 8px 0; }
+  .sales-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
+  .sale-row {
+    display: grid; grid-template-columns: 90px 1fr auto auto auto auto; gap: 12px; align-items: center;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+    font-size: 13px;
+  }
+  .sale-date { color: var(--text-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sale-name { font-weight: 500; overflow-wrap: anywhere; }
+  .sale-platform { white-space: nowrap; }
+  @media (max-width: 680px) {
+    .sale-row { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+    .sale-name { flex: 1 1 100%; order: 1; }
+    .sale-date { order: 2; }
+    .sale-platform { order: 3; }
+  }
 
   .cell-extras { display: block; text-align: left; }
   .cell-extras::before { content: none; }
@@ -493,6 +525,14 @@
     </div>
   </details>
 
+  <details class="panel" id="salesPanel">
+    <summary>📈 Ventes <span id="salesSummaryBadge" class="cost-percent"></span> <span class="chev">▶</span></summary>
+    <div class="panel-body">
+      <div class="sales-stats" id="salesStats"></div>
+      <div class="sales-list" id="salesList"></div>
+    </div>
+  </details>
+
   <div class="toolbar" style="margin-bottom: 12px; justify-content: space-between;">
     <button class="btn primary" id="btnAddRow">+ Ajouter un produit</button>
 
@@ -614,7 +654,9 @@
       sort: { key: null, dir: 1 },
       saleMode: "pro",
       totalsCollapsed: true,
-      settingsPanelOpen: true
+      settingsPanelOpen: true,
+      sales: [],
+      salesPanelOpen: false
     };
   }
 
@@ -630,6 +672,8 @@
       if (parsed.saleMode !== "pro" && parsed.saleMode !== "perso") parsed.saleMode = "pro";
       if (typeof parsed.totalsCollapsed !== "boolean") parsed.totalsCollapsed = true;
       if (typeof parsed.settingsPanelOpen !== "boolean") parsed.settingsPanelOpen = true;
+      if (!Array.isArray(parsed.sales)) parsed.sales = [];
+      if (typeof parsed.salesPanelOpen !== "boolean") parsed.salesPanelOpen = false;
       if (!Array.isArray(parsed.settings.platforms) || parsed.settings.platforms.length === 0) {
         parsed.settings.platforms = defaultState().settings.platforms;
       }
@@ -638,6 +682,14 @@
       console.warn("Lecture des données locales impossible, réinitialisation.", e);
       return defaultState();
     }
+  }
+
+  // Appliqué à tout état remplacé en bloc (sync Drive, import JSON) pour
+  // garantir la présence des champs ajoutés après la création du fichier.
+  function ensureSalesFields(s) {
+    if (!Array.isArray(s.sales)) s.sales = [];
+    if (typeof s.salesPanelOpen !== "boolean") s.salesPanelOpen = false;
+    return s;
   }
 
   function saveState() {
@@ -782,11 +834,12 @@
             // elle ne doit jamais écraser silencieusement le cloud avec une
             // version locale simplement parce qu'on vient de cliquer "Connecter".
             if (remote) {
-              state = remote;
+              state = ensureSalesFields(remote);
               try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
               renderHead();
               renderSettingsInputs();
               renderBody();
+              renderSales();
             }
           });
         } else {
@@ -886,11 +939,12 @@
       var localTime = state.savedAt ? new Date(state.savedAt).getTime() : 0;
       var remoteTime = remote && remote.savedAt ? new Date(remote.savedAt).getTime() : 0;
       if (remote && remoteTime > localTime) {
-        state = remote;
+        state = ensureSalesFields(remote);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
         renderHead();
         renderSettingsInputs();
         renderBody();
+        renderSales();
         setDriveStatus("☁ Mise à jour reçue depuis un autre appareil.");
         setTimeout(function () { setDriveStatus(""); }, 4000);
       }
@@ -1364,6 +1418,7 @@
       ? '<button class="btn small danger" data-action="del" data-id="' + p.id + '" title="Supprimer">✕</button>'
       : "";
     html += '<td class="cell-actions cell-detail" data-label="Actions"><div class="row-actions">' +
+      '<button class="btn small success" data-action="sold" data-id="' + p.id + '" title="Enregistrer une vente de ce produit">✓ Vendu</button>' +
       '<button class="btn small" data-action="dup" data-id="' + p.id + '" title="Dupliquer">⧉</button>' +
       delBtn +
       "</div></td>";
@@ -1571,8 +1626,77 @@
     });
   }
 
+  function formatDateFr(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+
+  function isSameMonth(iso, ref) {
+    var d = new Date(iso);
+    return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
+  }
+
+  function renderSales() {
+    var sales = state.sales || [];
+    var now = new Date();
+    var thisMonth = sales.filter(function (s) { return isSameMonth(s.date, now); });
+
+    function sum(list, key) { return list.reduce(function (acc, s) { return acc + (parseNum(s[key]) || 0); }, 0); }
+
+    var badge = document.getElementById("salesSummaryBadge");
+    badge.textContent = sales.length > 0
+      ? "(" + thisMonth.length + " ce mois-ci · " + formatCurrency(sum(thisMonth, "price")) + " CA)"
+      : "(aucune vente enregistrée)";
+
+    var statsEl = document.getElementById("salesStats");
+    function tile(label, value, cls) {
+      return '<div class="stat-tile"><div class="stat-label">' + escapeHtml(label) + '</div><div class="stat-value' + (cls ? " " + cls : "") + '">' + value + "</div></div>";
+    }
+    statsEl.innerHTML =
+      tile("Ventes ce mois", String(thisMonth.length)) +
+      tile("CA ce mois", formatCurrency(sum(thisMonth, "price"))) +
+      tile("Marge ce mois", formatCurrency(sum(thisMonth, "margin")), sum(thisMonth, "margin") < 0 ? "stat-negative" : "stat-positive") +
+      tile("Total (toutes dates)", sales.length + " ventes · " + formatCurrency(sum(sales, "price")));
+
+    var listEl = document.getElementById("salesList");
+    if (sales.length === 0) {
+      listEl.innerHTML = '<div class="sales-empty">Aucune vente enregistrée. Clique sur « ✓ Vendu » sur une fiche produit pour en ajouter une.</div>';
+      return;
+    }
+    var sorted = sales.slice().sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+    listEl.innerHTML = sorted.map(function (s) {
+      return '<div class="sale-row" data-sale-id="' + s.id + '">' +
+        '<div class="sale-date">' + formatDateFr(s.date) + "</div>" +
+        '<div class="sale-name">' + escapeHtml(s.name || "") + "</div>" +
+        '<div class="sale-platform cost-percent">' + escapeHtml(s.platformName || "") + "</div>" +
+        '<div class="num tabular">' + formatCurrency(parseNum(s.price)) + "</div>" +
+        '<div class="num tabular"><span class="margin-cell ' + marginClass(parseNum(s.price) > 0 ? (parseNum(s.margin) / parseNum(s.price) * 100) : null) + '">' + formatCurrency(parseNum(s.margin)) + "</span></div>" +
+        '<button class="btn small danger" data-action="removeSale" data-sale-id="' + s.id + '" title="Supprimer cette vente">✕</button>' +
+        "</div>";
+    }).join("");
+
+    var panel = document.getElementById("salesPanel");
+    if (panel) panel.open = !!state.salesPanelOpen;
+  }
+
+  document.getElementById("salesList").addEventListener("click", function (e) {
+    var btn = e.target.closest('[data-action="removeSale"]');
+    if (!btn) return;
+    var saleId = btn.getAttribute("data-sale-id");
+    if (!confirm("Supprimer cette vente de l'historique ?")) return;
+    state.sales = state.sales.filter(function (s) { return s.id !== saleId; });
+    saveState();
+    renderSales();
+  });
+
   document.getElementById("settingsPanel").addEventListener("toggle", function (e) {
     state.settingsPanelOpen = e.target.open;
+    saveState();
+  });
+
+  document.getElementById("salesPanel").addEventListener("toggle", function (e) {
+    state.salesPanelOpen = e.target.open;
     saveState();
   });
 
@@ -1671,7 +1795,26 @@
     if (!btn) return;
     var id = btn.getAttribute("data-id");
     var action = btn.getAttribute("data-action");
-    if (action === "dup") {
+    if (action === "sold") {
+      var soldProd = state.products.filter(function (x) { return x.id === id; })[0];
+      if (!soldProd) return;
+      var c = computeRow(soldProd);
+      var platform = findPlatform(soldProd.platformId);
+      state.sales.push({
+        id: uid("sale"),
+        productId: soldProd.id,
+        name: soldProd.name,
+        price: parseNum(soldProd.price),
+        cost: c.totalCost,
+        margin: c.netMargin,
+        platformId: soldProd.platformId,
+        platformName: platform ? platform.name : "",
+        date: new Date().toISOString(),
+        source: "manual"
+      });
+      saveState();
+      renderSales();
+    } else if (action === "dup") {
       var p = state.products.filter(function (x) { return x.id === id; })[0];
       if (!p) return;
       var copiedExtras = (p.extras || []).map(function (ex) { return Object.assign({}, ex, { id: uid("extra") }); });
@@ -1758,11 +1901,12 @@
           imported.settings.platforms = defaultState().settings.platforms;
         }
         if (!imported.sort) imported.sort = { key: null, dir: 1 };
-        state = imported;
+        state = ensureSalesFields(imported);
         saveState();
         renderHead();
         renderSettingsInputs();
         renderBody();
+        renderSales();
         alert("Import réussi.");
       } catch (err) {
         alert("Impossible de lire ce fichier JSON.");
@@ -1822,6 +1966,7 @@
   renderHead();
   renderSettingsInputs();
   renderBody();
+  renderSales();
   updateDriveButtonUI();
   tryAutoReconnectDrive();
 })();
