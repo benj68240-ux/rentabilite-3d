@@ -572,10 +572,10 @@
       products: [
         {
           id: uid("prod"),
-          name: "Exemple — Lampe personnalisée",
+          name: withEmbaseSuffix("Exemple — Lampe personnalisée", "E27"),
           price: "45", weight: "180", filamentPrice: "25",
           printTime: "6", laborTime: "20", packaging: "2", accessories: "8",
-          platformId: etsyId
+          embaseType: "E27", platformId: etsyId
         }
       ],
       sort: { key: null, dir: 1 },
@@ -955,6 +955,23 @@
     return list[0];
   }
 
+  // Embase obligatoire de chaque lampe (colonne dédiée, entre Accessoires et
+  // Plateforme) : E27 par défaut, ou LED. Chaque type ajoute un poids et un
+  // temps d'impression fixes au calcul.
+  var EMBASE_PRESETS = {
+    E27: { weight: 25, time: 1 },
+    LED: { weight: 15, time: 0.5 }
+  };
+
+  function getEmbaseType(p) {
+    return p.embaseType === "LED" ? "LED" : "E27";
+  }
+
+  function withEmbaseSuffix(name, embaseType) {
+    var base = String(name || "").replace(/\s*\+\s*Embase\s+(E27|LED)\s*$/i, "");
+    return base + " + Embase " + embaseType;
+  }
+
   function computeRow(p) {
     var s = state.settings;
     var price = parseNum(p.price);
@@ -965,14 +982,16 @@
     var packaging = parseNum(p.packaging);
     var accessories = parseNum(p.accessories);
 
+    var embasePreset = EMBASE_PRESETS[getEmbaseType(p)];
+
     var extrasWeight = 0, extrasTime = 0, extrasCost = 0;
     (p.extras || []).forEach(function (ex) {
       extrasWeight += parseNum(ex.weight);
       extrasTime += parseNum(ex.time);
       extrasCost += parseNum(ex.cost);
     });
-    var totalWeight = weight + extrasWeight;
-    var totalPrintTime = printTime + extrasTime;
+    var totalWeight = weight + embasePreset.weight + extrasWeight;
+    var totalPrintTime = printTime + embasePreset.time + extrasTime;
 
     var failureMult = 1 + parseNum(s.failureRate) / 100;
 
@@ -1049,7 +1068,8 @@
     { key: "laborTime", label: "M.O. (min)", type: "num", sort: "num" },
     { key: "packaging", label: "Packaging (€)", type: "num", sort: "num", percentKey: "packagingPercent" },
     { key: "accessories", label: "Accessoires (€)", type: "num", sort: "num", percentKey: "accessoriesPercent" },
-    { key: "platformId", label: "Plateforme", type: "select" }
+    { key: "embaseType", label: "Embase", type: "select", sort: "text", optionsFn: function (p) { return embaseOptionsHtml(getEmbaseType(p)); } },
+    { key: "platformId", label: "Plateforme", type: "select", optionsFn: function (p) { return platformOptionsHtml(p.platformId); } }
   ];
 
   var COMPUTED_FIELDS = [
@@ -1157,6 +1177,11 @@
     }).join("");
   }
 
+  function embaseOptionsHtml(selectedType) {
+    return '<option value="E27"' + (selectedType === "E27" ? " selected" : "") + ">Embase E27</option>" +
+      '<option value="LED"' + (selectedType === "LED" ? " selected" : "") + ">Embase LED</option>";
+  }
+
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -1185,6 +1210,9 @@
       } else if (editField && key === "platformId") {
         va = (findPlatform(a.platformId) || {}).name || ""; vb = (findPlatform(b.platformId) || {}).name || "";
         return va < vb ? -1 * state.sort.dir : va > vb ? 1 * state.sort.dir : 0;
+      } else if (editField && key === "embaseType") {
+        va = getEmbaseType(a); vb = getEmbaseType(b);
+        return va < vb ? -1 * state.sort.dir : va > vb ? 1 * state.sort.dir : 0;
       } else {
         va = parseNum(a[key]); vb = parseNum(b[key]);
       }
@@ -1193,13 +1221,6 @@
     return arr;
   }
 
-  // Valeurs poids/temps imposées par le type d'embase (ligne "embase":true) :
-  // changer le menu déroulant recalcule automatiquement ces deux champs.
-  var EMBASE_PRESETS = {
-    "Embase E27": { weight: "25", time: "1" },
-    "Embase LED": { weight: "15", time: "0.5" }
-  };
-
   // Lignes d'options personnalisables par produit (ex: "Suspension" = +58g,
   // +1h47) : leur poids et temps s'ajoutent au calcul du coût matière et
   // électricité de la ligne.
@@ -1207,23 +1228,12 @@
     var extras = p.extras || [];
     var isUnlocked = unlockedIds.has(p.id);
     var lockAttr = isUnlocked ? "" : " readonly";
-    var hasEmbase = extras.some(function (ex) { return ex.embase; });
     var rows = extras.map(function (ex) {
-      var removeBtn = (isUnlocked && !ex.embase)
+      var removeBtn = isUnlocked
         ? '<button class="btn small danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette ligne">✕</button>'
         : "";
-      var nameCell;
-      if (ex.embase) {
-        var isE27 = ex.name !== "Embase LED";
-        nameCell = '<select class="cell-select" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name"' + lockAttr + (isUnlocked ? "" : " disabled") + '>' +
-          '<option value="Embase E27"' + (isE27 ? " selected" : "") + '>Embase E27</option>' +
-          '<option value="Embase LED"' + (!isE27 ? " selected" : "") + '>Embase LED</option>' +
-          "</select>";
-      } else {
-        nameCell = '<input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"' + lockAttr + '>';
-      }
       return '<div class="extra-row" data-extra-row="' + ex.id + '">' +
-        '<div><span class="lbl">Nom</span>' + nameCell + "</div>" +
+        '<div><span class="lbl">Nom</span><input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"' + lockAttr + '></div>' +
         '<div><span class="lbl">Poids suppl. (g)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="weight" value="' + escapeHtml(ex.weight || "") + '"' + lockAttr + '></div>' +
         '<div><span class="lbl">Temps suppl. (h)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="time" value="' + escapeHtml(ex.time || "") + '"' + lockAttr + '></div>' +
         '<div><span class="lbl">Coût pièce (€)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="cost" value="' + escapeHtml(ex.cost || "") + '"' + lockAttr + '></div>' +
@@ -1231,8 +1241,7 @@
         "</div>";
     }).join("");
     var addBtn = isUnlocked
-      ? '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button> ' +
-        (hasEmbase ? "" : '<button class="btn small" data-action="addEmbasePreset" data-id="' + p.id + '" title="Ajoute une ligne Embase obligatoire, réglée sur E27 par défaut (modifiable en LED)">+ Embase (E27 par défaut)</button>')
+      ? '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button>'
       : "";
     return '<td class="cell-detail cell-extras" data-label="Options / lignes suppl.">' +
       '<div class="extras-box"><div class="extras-title">Options / lignes supplémentaires</div>' + rows + addBtn +
@@ -1259,7 +1268,7 @@
       var isName = f.key === "name";
       var cls = (f.frozen ? "frozen-col " : "") + (f.type === "num" ? "num" : "") + (f.key === "platformId" ? " col-platform" : "") + (isName ? " cell-name" : " cell-detail");
       if (f.type === "select") {
-        html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '"><select class="cell-select" data-id="' + p.id + '" data-field="' + f.key + '"' + lockAttrSelect + '>' + platformOptionsHtml(p.platformId) + "</select></td>";
+        html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '"><select class="cell-select" data-id="' + p.id + '" data-field="' + f.key + '"' + lockAttrSelect + '>' + f.optionsFn(p) + "</select></td>";
       } else {
         var inputCls = "cell-input tabular" + (isName ? " name-input" : "");
         var type = f.type === "num" ? "text" : "text";
@@ -1309,7 +1318,24 @@
     return inner;
   }
 
+  // Les produits créés avant l'ajout de la colonne Embase n'ont pas encore
+  // embaseType : on les bascule une fois sur E27 (valeur par défaut) et on
+  // met leur titre à jour en conséquence, quelle que soit l'origine des
+  // données (stockage local, sync Drive, import JSON).
+  function normalizeEmbaseTypes() {
+    var changed = false;
+    state.products.forEach(function (p) {
+      if (!p.embaseType) {
+        p.embaseType = "E27";
+        p.name = withEmbaseSuffix(p.name, "E27");
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   function renderBody() {
+    if (normalizeEmbaseTypes()) saveState();
     var tbody = document.getElementById("tbody");
     var list = sortedProducts();
     if (list.length === 0) {
@@ -1564,19 +1590,12 @@
       saveState();
       updateRowComputed(id);
       updateTotals();
-    } else if (target.matches('select[data-extra-field="name"]')) {
-      var exSelId = target.getAttribute("data-id");
-      var exSelProd = state.products.filter(function (x) { return x.id === exSelId; })[0];
-      if (!exSelProd) return;
-      var exSelExtraId = target.getAttribute("data-extra-id");
-      var exSelExtra = (exSelProd.extras || []).filter(function (x) { return x.id === exSelExtraId; })[0];
-      if (!exSelExtra) return;
-      exSelExtra.name = target.value;
-      var preset = EMBASE_PRESETS[target.value];
-      if (exSelExtra.embase && preset) {
-        exSelExtra.weight = preset.weight;
-        exSelExtra.time = preset.time;
-      }
+    } else if (target.matches('select[data-field="embaseType"]')) {
+      var embId = target.getAttribute("data-id");
+      var embProd = state.products.filter(function (x) { return x.id === embId; })[0];
+      if (!embProd) return;
+      embProd.embaseType = target.value;
+      embProd.name = withEmbaseSuffix(embProd.name, target.value);
       saveState();
       renderBody();
     } else if (target.matches("input.row-select")) {
@@ -1624,19 +1643,11 @@
       extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0", cost: "0" });
       saveState();
       renderBody();
-    } else if (action === "addEmbasePreset") {
-      var embaseProd = state.products.filter(function (x) { return x.id === id; })[0];
-      if (!embaseProd) return;
-      if (!embaseProd.extras) embaseProd.extras = [];
-      if (embaseProd.extras.some(function (x) { return x.embase; })) return;
-      embaseProd.extras.push({ id: uid("extra"), name: "Embase E27", weight: EMBASE_PRESETS["Embase E27"].weight, time: EMBASE_PRESETS["Embase E27"].time, cost: "0", embase: true });
-      saveState();
-      renderBody();
     } else if (action === "removeExtra") {
       var rmProd = state.products.filter(function (x) { return x.id === id; })[0];
       if (!rmProd) return;
       var rmExtraId = btn.getAttribute("data-extra-id");
-      rmProd.extras = (rmProd.extras || []).filter(function (x) { return x.id !== rmExtraId || x.embase; });
+      rmProd.extras = (rmProd.extras || []).filter(function (x) { return x.id !== rmExtraId; });
       saveState();
       renderBody();
     }
@@ -1644,9 +1655,9 @@
 
   document.getElementById("btnAddRow").addEventListener("click", function () {
     state.products.push({
-      id: uid("prod"), name: "Nouveau produit", price: "0", weight: "0", filamentPrice: "0",
+      id: uid("prod"), name: withEmbaseSuffix("Nouveau produit", "E27"), price: "0", weight: "0", filamentPrice: "0",
       printTime: "0", laborTime: "0", packaging: "0", accessories: "0",
-      platformId: state.settings.platforms[0].id, extras: []
+      embaseType: "E27", platformId: state.settings.platforms[0].id, extras: []
     });
     saveState();
     renderBody();
@@ -1717,7 +1728,7 @@
 
   document.getElementById("btnExportCsv").addEventListener("click", function () {
     var headers = ["Produit", "Prix vente TTC (€)", "Poids (g)", "Filament (€/kg)", "Temps impression (h)",
-      "Main d'œuvre (min)", "Packaging (€)", "Accessoires (€)", "Plateforme",
+      "Main d'œuvre (min)", "Packaging (€)", "Accessoires (€)", "Embase", "Plateforme",
       "Coût matière (€)", "Élec. + amortissement (€)", "Coût plateforme (€)", "Cotisations (€)",
       "Main d'œuvre (€)", "Coût total (€)", "Marge nette (€)", "Marge nette (%)", "Prix minimum cible (€)"];
 
@@ -1735,6 +1746,7 @@
         csvNum(parseNum(p.laborTime), 0),
         csvNum(parseNum(p.packaging)),
         csvNum(parseNum(p.accessories)),
+        getEmbaseType(p),
         platform ? platform.name : "",
         csvNum(c.materialCost), csvNum(c.energyCost), csvNum(c.platformCost), csvNum(c.socialCost),
         csvNum(c.laborCost), csvNum(c.totalCost), csvNum(c.netMargin), csvNum(c.netMarginPercent, 1),
