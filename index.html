@@ -1193,6 +1193,13 @@
     return arr;
   }
 
+  // Valeurs poids/temps imposées par le type d'embase (ligne "embase":true) :
+  // changer le menu déroulant recalcule automatiquement ces deux champs.
+  var EMBASE_PRESETS = {
+    "Embase E27": { weight: "25", time: "1" },
+    "Embase LED": { weight: "15", time: "0.5" }
+  };
+
   // Lignes d'options personnalisables par produit (ex: "Suspension" = +58g,
   // +1h47) : leur poids et temps s'ajoutent au calcul du coût matière et
   // électricité de la ligne.
@@ -1565,9 +1572,13 @@
       var exSelExtra = (exSelProd.extras || []).filter(function (x) { return x.id === exSelExtraId; })[0];
       if (!exSelExtra) return;
       exSelExtra.name = target.value;
+      var preset = EMBASE_PRESETS[target.value];
+      if (exSelExtra.embase && preset) {
+        exSelExtra.weight = preset.weight;
+        exSelExtra.time = preset.time;
+      }
       saveState();
-      updateRowComputed(exSelId);
-      updateTotals();
+      renderBody();
     } else if (target.matches("input.row-select")) {
       var selId = target.getAttribute("data-id");
       if (target.checked) selectedIds.add(selId); else selectedIds.delete(selId);
@@ -1618,7 +1629,7 @@
       if (!embaseProd) return;
       if (!embaseProd.extras) embaseProd.extras = [];
       if (embaseProd.extras.some(function (x) { return x.embase; })) return;
-      embaseProd.extras.push({ id: uid("extra"), name: "Embase E27", weight: "0", time: "0", cost: "0", embase: true });
+      embaseProd.extras.push({ id: uid("extra"), name: "Embase E27", weight: EMBASE_PRESETS["Embase E27"].weight, time: EMBASE_PRESETS["Embase E27"].time, cost: "0", embase: true });
       saveState();
       renderBody();
     } else if (action === "removeExtra") {
