@@ -29,9 +29,6 @@
     bouton "Exporter (JSON)" pour sauvegarder une copie de votre travail
     dans un fichier, et "Importer (JSON)" pour le restaurer si besoin
     (nouvel ordinateur, changement de navigateur, sécurité...).
-  - Le bouton "Exporter en CSV" sert uniquement à obtenir un tableau lisible
-    dans Excel (il ne peut pas être ré-importé ici, utilisez le JSON pour
-    les sauvegardes).
   ============================================================================
 -->
 <html lang="fr">
@@ -153,8 +150,8 @@
   }
   header.top .brand { display: flex; flex-direction: column; gap: 6px; }
   header.top .brand-banner {
-    display: block; height: 64px; width: auto; max-width: 100%; object-fit: contain;
-    border-radius: 10px; box-shadow: var(--shadow);
+    display: block; height: 108px; width: auto; max-width: 100%; object-fit: contain;
+    border-radius: 12px; box-shadow: var(--shadow);
   }
   header.top .subtitle { color: var(--text-soft); font-size: 13px; margin-top: 2px; }
 
@@ -351,7 +348,7 @@
 
   @media (max-width: 680px) {
     .app { padding: 14px 10px 40px; }
-    header.top .brand-banner { height: 48px; }
+    header.top .brand-banner { height: 76px; }
     .settings-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
     .platform-row { grid-template-columns: 1fr 1fr; }
     table { font-size: 12px; }
@@ -439,7 +436,6 @@
       <button class="btn" id="btnExportJson">⬇ Exporter (JSON)</button>
       <button class="btn" id="btnImportJson">⬆ Importer (JSON)</button>
       <input type="file" id="fileImport" accept="application/json" class="visually-hidden">
-      <button class="btn" id="btnExportCsv">📄 Exporter en CSV</button>
       <button class="btn" id="btnDriveConnect">☁ Connecter Google Drive</button>
       <button class="btn visually-hidden" id="btnDriveSyncNow">🔄 Synchroniser maintenant</button>
     </div>
@@ -1774,53 +1770,6 @@
     };
     reader.readAsText(file);
     e.target.value = "";
-  });
-
-  // ---------------------------------------------------------------------
-  // Export CSV (Excel FR : séparateur ; et décimales avec virgule)
-  // ---------------------------------------------------------------------
-  function csvEscape(val) {
-    var s = String(val);
-    if (/[;"\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
-    return s;
-  }
-  function csvNum(n, decimals) {
-    if (n === null || n === undefined || isNaN(n) || !isFinite(n)) return "";
-    return n.toFixed(decimals === undefined ? 2 : decimals).replace(".", ",");
-  }
-
-  document.getElementById("btnExportCsv").addEventListener("click", function () {
-    var headers = ["Produit", "Prix vente TTC (€)", "Poids (g)", "Filament (€/kg)", "Temps impression (h)",
-      "Main d'œuvre (min)", "Packaging (€)", "Accessoires (€)", "Embase", "Plateforme",
-      "Coût matière (€)", "Élec. + amortissement (€)", "Coût plateforme (€)", "Cotisations (€)",
-      "Main d'œuvre (€)", "Coût total (€)", "Marge nette (€)", "Marge nette (%)", "Prix minimum cible (€)"];
-
-    var lines = [headers.map(csvEscape).join(";")];
-
-    state.products.forEach(function (p) {
-      var c = computeRow(p);
-      var platform = findPlatform(p.platformId);
-      var row = [
-        p.name || "",
-        csvNum(parseNum(p.price)),
-        csvNum(parseNum(p.weight)),
-        csvNum(parseNum(p.filamentPrice)),
-        csvNum(parseNum(p.printTime), 2),
-        csvNum(parseNum(p.laborTime), 0),
-        csvNum(parseNum(p.packaging)),
-        csvNum(parseNum(p.accessories)),
-        isLampProduct(p) ? (getEmbaseType(p) === "NONE" ? "Aucune" : getEmbaseType(p)) : "",
-        platform ? platform.name : "",
-        csvNum(c.materialCost), csvNum(c.energyCost), csvNum(c.platformCost), csvNum(c.socialCost),
-        csvNum(c.laborCost), csvNum(c.totalCost), csvNum(c.netMargin), csvNum(c.netMarginPercent, 1),
-        csvNum(c.minPrice)
-      ];
-      lines.push(row.map(csvEscape).join(";"));
-    });
-
-    var csvContent = "﻿" + lines.join("\r\n");
-    var dateStr = new Date().toISOString().slice(0, 10);
-    downloadBlob(csvContent, "rentabilite-3d-" + dateStr + ".csv", "text/csv;charset=utf-8;");
   });
 
   // ---------------------------------------------------------------------
