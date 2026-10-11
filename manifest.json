@@ -1,0 +1,15 @@
+{
+  "name": "Rentabilité 3D",
+  "short_name": "Rentabilité 3D",
+  "description": "Calculateur de rentabilité pour créations imprimées en 3D",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#faf9f6",
+  "theme_color": "#9c6b30",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
