@@ -976,6 +976,10 @@
 
     var failureMult = 1 + parseNum(s.failureRate) / 100;
 
+    // Les options (ex: embase LED/E27) sont perdues en cas d'échec d'impression
+    // au même titre que le filament et le temps d'impression.
+    extrasCost = extrasCost * failureMult;
+
     var materialCost = (totalWeight / 1000 * filamentPrice) * failureMult;
 
     var printerLifetime = parseNum(s.printerLifetime);
