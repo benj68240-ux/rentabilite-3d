@@ -1200,12 +1200,23 @@
     var extras = p.extras || [];
     var isUnlocked = unlockedIds.has(p.id);
     var lockAttr = isUnlocked ? "" : " readonly";
+    var hasEmbase = extras.some(function (ex) { return ex.embase; });
     var rows = extras.map(function (ex) {
-      var removeBtn = isUnlocked
+      var removeBtn = (isUnlocked && !ex.embase)
         ? '<button class="btn small danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette ligne">✕</button>'
         : "";
+      var nameCell;
+      if (ex.embase) {
+        var isE27 = ex.name !== "Embase LED";
+        nameCell = '<select class="cell-select" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name"' + lockAttr + (isUnlocked ? "" : " disabled") + '>' +
+          '<option value="Embase E27"' + (isE27 ? " selected" : "") + '>Embase E27</option>' +
+          '<option value="Embase LED"' + (!isE27 ? " selected" : "") + '>Embase LED</option>' +
+          "</select>";
+      } else {
+        nameCell = '<input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"' + lockAttr + '>';
+      }
       return '<div class="extra-row" data-extra-row="' + ex.id + '">' +
-        '<div><span class="lbl">Nom</span><input type="text" class="cell-input" placeholder="Ex: Suspension" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="name" value="' + escapeHtml(ex.name || "") + '"' + lockAttr + '></div>' +
+        '<div><span class="lbl">Nom</span>' + nameCell + "</div>" +
         '<div><span class="lbl">Poids suppl. (g)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="weight" value="' + escapeHtml(ex.weight || "") + '"' + lockAttr + '></div>' +
         '<div><span class="lbl">Temps suppl. (h)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="time" value="' + escapeHtml(ex.time || "") + '"' + lockAttr + '></div>' +
         '<div><span class="lbl">Coût pièce (€)</span><input type="text" inputmode="decimal" class="cell-input tabular" data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="cost" value="' + escapeHtml(ex.cost || "") + '"' + lockAttr + '></div>' +
@@ -1214,7 +1225,7 @@
     }).join("");
     var addBtn = isUnlocked
       ? '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button> ' +
-        '<button class="btn small" data-action="addEmbasePreset" data-id="' + p.id + '" title="Ajoute deux lignes préremplies : Embase LED et Embase E27">+ Embases LED/E27</button>'
+        (hasEmbase ? "" : '<button class="btn small" data-action="addEmbasePreset" data-id="' + p.id + '" title="Ajoute une ligne Embase obligatoire, réglée sur E27 par défaut (modifiable en LED)">+ Embase (E27 par défaut)</button>')
       : "";
     return '<td class="cell-detail cell-extras" data-label="Options / lignes suppl.">' +
       '<div class="extras-box"><div class="extras-title">Options / lignes supplémentaires</div>' + rows + addBtn +
@@ -1546,6 +1557,17 @@
       saveState();
       updateRowComputed(id);
       updateTotals();
+    } else if (target.matches('select[data-extra-field="name"]')) {
+      var exSelId = target.getAttribute("data-id");
+      var exSelProd = state.products.filter(function (x) { return x.id === exSelId; })[0];
+      if (!exSelProd) return;
+      var exSelExtraId = target.getAttribute("data-extra-id");
+      var exSelExtra = (exSelProd.extras || []).filter(function (x) { return x.id === exSelExtraId; })[0];
+      if (!exSelExtra) return;
+      exSelExtra.name = target.value;
+      saveState();
+      updateRowComputed(exSelId);
+      updateTotals();
     } else if (target.matches("input.row-select")) {
       var selId = target.getAttribute("data-id");
       if (target.checked) selectedIds.add(selId); else selectedIds.delete(selId);
@@ -1595,17 +1617,15 @@
       var embaseProd = state.products.filter(function (x) { return x.id === id; })[0];
       if (!embaseProd) return;
       if (!embaseProd.extras) embaseProd.extras = [];
-      embaseProd.extras.push(
-        { id: uid("extra"), name: "Embase LED", weight: "0", time: "0", cost: "0" },
-        { id: uid("extra"), name: "Embase E27", weight: "0", time: "0", cost: "0" }
-      );
+      if (embaseProd.extras.some(function (x) { return x.embase; })) return;
+      embaseProd.extras.push({ id: uid("extra"), name: "Embase E27", weight: "0", time: "0", cost: "0", embase: true });
       saveState();
       renderBody();
     } else if (action === "removeExtra") {
       var rmProd = state.products.filter(function (x) { return x.id === id; })[0];
       if (!rmProd) return;
       var rmExtraId = btn.getAttribute("data-extra-id");
-      rmProd.extras = (rmProd.extras || []).filter(function (x) { return x.id !== rmExtraId; });
+      rmProd.extras = (rmProd.extras || []).filter(function (x) { return x.id !== rmExtraId || x.embase; });
       saveState();
       renderBody();
     }
