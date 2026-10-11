@@ -955,21 +955,29 @@
     return list[0];
   }
 
-  // Embase obligatoire de chaque lampe (colonne dédiée, entre Accessoires et
-  // Plateforme) : E27 par défaut, ou LED. Chaque type ajoute un poids et un
-  // temps d'impression fixes au calcul.
+  // Embase obligatoire, mais uniquement sur les modèles de lampe (nom
+  // contenant "lampe") : colonne dédiée, entre Accessoires et Plateforme,
+  // E27 par défaut, ou LED. Chaque type ajoute un poids et un temps
+  // d'impression fixes au calcul. Absente/sans effet sur les autres produits.
   var EMBASE_PRESETS = {
     E27: { weight: 25, time: 1 },
     LED: { weight: 15, time: 0.5 }
   };
+
+  function embaseBaseName(name) {
+    return String(name || "").replace(/\s*\+\s*Embase\s+(E27|LED)\s*$/i, "");
+  }
+
+  function isLampProduct(p) {
+    return /lampe/i.test(embaseBaseName(p.name));
+  }
 
   function getEmbaseType(p) {
     return p.embaseType === "LED" ? "LED" : "E27";
   }
 
   function withEmbaseSuffix(name, embaseType) {
-    var base = String(name || "").replace(/\s*\+\s*Embase\s+(E27|LED)\s*$/i, "");
-    return base + " + Embase " + embaseType;
+    return embaseBaseName(name) + " + Embase " + embaseType;
   }
 
   function computeRow(p) {
@@ -982,7 +990,7 @@
     var packaging = parseNum(p.packaging);
     var accessories = parseNum(p.accessories);
 
-    var embasePreset = EMBASE_PRESETS[getEmbaseType(p)];
+    var embasePreset = isLampProduct(p) ? EMBASE_PRESETS[getEmbaseType(p)] : { weight: 0, time: 0 };
 
     var extrasWeight = 0, extrasTime = 0, extrasCost = 0;
     (p.extras || []).forEach(function (ex) {
@@ -1268,7 +1276,11 @@
       var isName = f.key === "name";
       var cls = (f.frozen ? "frozen-col " : "") + (f.type === "num" ? "num" : "") + (f.key === "platformId" ? " col-platform" : "") + (isName ? " cell-name" : " cell-detail");
       if (f.type === "select") {
-        html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '"><select class="cell-select" data-id="' + p.id + '" data-field="' + f.key + '"' + lockAttrSelect + '>' + f.optionsFn(p) + "</select></td>";
+        if (f.key === "embaseType" && !isLampProduct(p)) {
+          html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '"><span class="cost-percent">— (pas une lampe)</span></td>';
+        } else {
+          html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '"><select class="cell-select" data-id="' + p.id + '" data-field="' + f.key + '"' + lockAttrSelect + '>' + f.optionsFn(p) + "</select></td>";
+        }
       } else {
         var inputCls = "cell-input tabular" + (isName ? " name-input" : "");
         var type = f.type === "num" ? "text" : "text";
@@ -1318,14 +1330,15 @@
     return inner;
   }
 
-  // Les produits créés avant l'ajout de la colonne Embase n'ont pas encore
+  // Les lampes créées avant l'ajout de la colonne Embase n'ont pas encore
   // embaseType : on les bascule une fois sur E27 (valeur par défaut) et on
   // met leur titre à jour en conséquence, quelle que soit l'origine des
-  // données (stockage local, sync Drive, import JSON).
+  // données (stockage local, sync Drive, import JSON). Les produits dont le
+  // nom ne contient pas "lampe" ne sont jamais touchés.
   function normalizeEmbaseTypes() {
     var changed = false;
     state.products.forEach(function (p) {
-      if (!p.embaseType) {
+      if (isLampProduct(p) && !p.embaseType) {
         p.embaseType = "E27";
         p.name = withEmbaseSuffix(p.name, "E27");
         changed = true;
@@ -1655,9 +1668,9 @@
 
   document.getElementById("btnAddRow").addEventListener("click", function () {
     state.products.push({
-      id: uid("prod"), name: withEmbaseSuffix("Nouveau produit", "E27"), price: "0", weight: "0", filamentPrice: "0",
+      id: uid("prod"), name: "Nouveau produit", price: "0", weight: "0", filamentPrice: "0",
       printTime: "0", laborTime: "0", packaging: "0", accessories: "0",
-      embaseType: "E27", platformId: state.settings.platforms[0].id, extras: []
+      platformId: state.settings.platforms[0].id, extras: []
     });
     saveState();
     renderBody();
@@ -1746,7 +1759,7 @@
         csvNum(parseNum(p.laborTime), 0),
         csvNum(parseNum(p.packaging)),
         csvNum(parseNum(p.accessories)),
-        getEmbaseType(p),
+        isLampProduct(p) ? getEmbaseType(p) : "",
         platform ? platform.name : "",
         csvNum(c.materialCost), csvNum(c.energyCost), csvNum(c.platformCost), csvNum(c.socialCost),
         csvNum(c.laborCost), csvNum(c.totalCost), csvNum(c.netMargin), csvNum(c.netMarginPercent, 1),
