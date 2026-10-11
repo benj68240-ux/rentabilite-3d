@@ -1,4 +1,4 @@
-var CACHE_NAME = "rentabilite3d-v1";
+var CACHE_NAME = "margo3d-v2";
 var CORE_ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function (event) {

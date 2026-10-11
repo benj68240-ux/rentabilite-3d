@@ -1,6 +1,6 @@
 {
-  "name": "Rentabilité 3D",
-  "short_name": "Rentabilité 3D",
+  "name": "Margo3D — Rentabilité impression 3D",
+  "short_name": "Margo3D",
   "description": "Calculateur de rentabilité pour créations imprimées en 3D",
   "start_url": "./index.html",
   "scope": "./",
