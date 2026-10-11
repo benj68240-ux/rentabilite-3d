@@ -1,13 +1,13 @@
 {
-  "name": "AB Rentabilité — Atelier Baradel",
-  "short_name": "AB Rentabilité",
+  "name": "L'Atelier Baradel — Rentabilité",
+  "short_name": "Atelier Baradel",
   "description": "Calculateur de rentabilité pour les créations imprimées en 3D de l'Atelier Baradel",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#faf9f6",
-  "theme_color": "#0055A4",
+  "theme_color": "#17181a",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
