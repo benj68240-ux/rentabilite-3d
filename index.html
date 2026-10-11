@@ -1209,7 +1209,8 @@
         "</div>";
     }).join("");
     var addBtn = isUnlocked
-      ? '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button>'
+      ? '<button class="btn small" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une ligne</button> ' +
+        '<button class="btn small" data-action="addEmbasePreset" data-id="' + p.id + '" title="Ajoute deux lignes préremplies : Embase LED et Embase E27">+ Embases LED/E27</button>'
       : "";
     return '<td class="cell-detail cell-extras" data-label="Options / lignes suppl.">' +
       '<div class="extras-box"><div class="extras-title">Options / lignes supplémentaires</div>' + rows + addBtn +
@@ -1584,6 +1585,16 @@
       if (!extraProd) return;
       if (!extraProd.extras) extraProd.extras = [];
       extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0", cost: "0" });
+      saveState();
+      renderBody();
+    } else if (action === "addEmbasePreset") {
+      var embaseProd = state.products.filter(function (x) { return x.id === id; })[0];
+      if (!embaseProd) return;
+      if (!embaseProd.extras) embaseProd.extras = [];
+      embaseProd.extras.push(
+        { id: uid("extra"), name: "Embase LED", weight: "0", time: "0", cost: "0" },
+        { id: uid("extra"), name: "Embase E27", weight: "0", time: "0", cost: "0" }
+      );
       saveState();
       renderBody();
     } else if (action === "removeExtra") {
