@@ -1,5 +1,9 @@
-var CACHE_NAME = "ab-rentabilite-v4";
-var CORE_ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
+var CACHE_NAME = "ab-rentabilite-v5";
+var CORE_ASSETS = [
+  "./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png",
+  "./fonts/Inter-Regular.woff2", "./fonts/Inter-Medium.woff2",
+  "./fonts/Inter-SemiBold.woff2", "./fonts/Inter-Bold.woff2"
+];
 
 self.addEventListener("install", function (event) {
   event.waitUntil(
