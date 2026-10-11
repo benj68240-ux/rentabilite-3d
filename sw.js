@@ -1,4 +1,4 @@
-var CACHE_NAME = "ab-rentabilite-v3";
+var CACHE_NAME = "ab-rentabilite-v4";
 var CORE_ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function (event) {
