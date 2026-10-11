@@ -572,9 +572,9 @@
       products: [
         {
           id: uid("prod"),
-          name: withEmbaseSuffix("Exemple — Lampe personnalisée", "E27"),
-          price: "45", weight: "180", filamentPrice: "25",
-          printTime: "6", laborTime: "20", packaging: "2", accessories: "8",
+          name: embaseTitle("Exemple — Lampe personnalisée", "E27"),
+          price: "45", weight: "205", filamentPrice: "25",
+          printTime: "7", laborTime: "20", packaging: "2", accessories: "8",
           embaseType: "E27", platformId: etsyId
         }
       ],
@@ -957,11 +957,14 @@
 
   // Embase obligatoire, mais uniquement sur les modèles de lampe (nom
   // contenant "lampe") : colonne dédiée, entre Accessoires et Plateforme,
-  // E27 par défaut, ou LED. Chaque type ajoute un poids et un temps
-  // d'impression fixes au calcul. Absente/sans effet sur les autres produits.
+  // E27 par défaut, LED, ou Aucune. Changer le type ajoute/retire directement
+  // le poids et le temps d'impression correspondants dans les champs
+  // "Poids (g)" / "Temps impr. (h)" (visibles, au-dessus de la colonne
+  // Embase) — computeRow ne fait ensuite plus aucun ajout caché.
   var EMBASE_PRESETS = {
     E27: { weight: 25, time: 1 },
-    LED: { weight: 15, time: 0.5 }
+    LED: { weight: 15, time: 0.5 },
+    NONE: { weight: 0, time: 0 }
   };
 
   function embaseBaseName(name) {
@@ -973,11 +976,24 @@
   }
 
   function getEmbaseType(p) {
-    return p.embaseType === "LED" ? "LED" : "E27";
+    return (p.embaseType === "LED" || p.embaseType === "NONE") ? p.embaseType : "E27";
   }
 
-  function withEmbaseSuffix(name, embaseType) {
-    return embaseBaseName(name) + " + Embase " + embaseType;
+  function embaseTitle(name, embaseType) {
+    var base = embaseBaseName(name);
+    return embaseType === "NONE" ? base : base + " + Embase " + embaseType;
+  }
+
+  // Bascule un produit d'un type d'embase à un autre : retire le poids/temps
+  // de l'ancien type (ou rien si c'était encore vierge) et ajoute celui du
+  // nouveau, directement dans les champs Poids (g) / Temps impr. (h).
+  function applyEmbaseType(p, newType) {
+    var oldPreset = p.embaseType ? EMBASE_PRESETS[getEmbaseType(p)] : EMBASE_PRESETS.NONE;
+    var newPreset = EMBASE_PRESETS[newType] || EMBASE_PRESETS.NONE;
+    p.weight = String(parseNum(p.weight) - oldPreset.weight + newPreset.weight);
+    p.printTime = String(parseNum(p.printTime) - oldPreset.time + newPreset.time);
+    p.embaseType = newType;
+    p.name = embaseTitle(p.name, newType);
   }
 
   function computeRow(p) {
@@ -990,16 +1006,14 @@
     var packaging = parseNum(p.packaging);
     var accessories = parseNum(p.accessories);
 
-    var embasePreset = isLampProduct(p) ? EMBASE_PRESETS[getEmbaseType(p)] : { weight: 0, time: 0 };
-
     var extrasWeight = 0, extrasTime = 0, extrasCost = 0;
     (p.extras || []).forEach(function (ex) {
       extrasWeight += parseNum(ex.weight);
       extrasTime += parseNum(ex.time);
       extrasCost += parseNum(ex.cost);
     });
-    var totalWeight = weight + embasePreset.weight + extrasWeight;
-    var totalPrintTime = printTime + embasePreset.time + extrasTime;
+    var totalWeight = weight + extrasWeight;
+    var totalPrintTime = printTime + extrasTime;
 
     var failureMult = 1 + parseNum(s.failureRate) / 100;
 
@@ -1187,7 +1201,8 @@
 
   function embaseOptionsHtml(selectedType) {
     return '<option value="E27"' + (selectedType === "E27" ? " selected" : "") + ">Embase E27</option>" +
-      '<option value="LED"' + (selectedType === "LED" ? " selected" : "") + ">Embase LED</option>";
+      '<option value="LED"' + (selectedType === "LED" ? " selected" : "") + ">Embase LED</option>" +
+      '<option value="NONE"' + (selectedType === "NONE" ? " selected" : "") + ">Aucune</option>";
   }
 
   function escapeHtml(str) {
@@ -1339,8 +1354,7 @@
     var changed = false;
     state.products.forEach(function (p) {
       if (isLampProduct(p) && !p.embaseType) {
-        p.embaseType = "E27";
-        p.name = withEmbaseSuffix(p.name, "E27");
+        applyEmbaseType(p, "E27");
         changed = true;
       }
     });
@@ -1570,7 +1584,7 @@
 
   tbody.addEventListener("input", function (e) {
     var target = e.target;
-    if (target.matches("[data-field]")) {
+    if (target.matches("input[data-field]")) {
       var id = target.getAttribute("data-id");
       var field = target.getAttribute("data-field");
       var p = state.products.filter(function (x) { return x.id === id; })[0];
@@ -1607,8 +1621,7 @@
       var embId = target.getAttribute("data-id");
       var embProd = state.products.filter(function (x) { return x.id === embId; })[0];
       if (!embProd) return;
-      embProd.embaseType = target.value;
-      embProd.name = withEmbaseSuffix(embProd.name, target.value);
+      applyEmbaseType(embProd, target.value);
       saveState();
       renderBody();
     } else if (target.matches("input.row-select")) {
@@ -1759,7 +1772,7 @@
         csvNum(parseNum(p.laborTime), 0),
         csvNum(parseNum(p.packaging)),
         csvNum(parseNum(p.accessories)),
-        isLampProduct(p) ? getEmbaseType(p) : "",
+        isLampProduct(p) ? (getEmbaseType(p) === "NONE" ? "Aucune" : getEmbaseType(p)) : "",
         platform ? platform.name : "",
         csvNum(c.materialCost), csvNum(c.energyCost), csvNum(c.platformCost), csvNum(c.socialCost),
         csvNum(c.laborCost), csvNum(c.totalCost), csvNum(c.netMargin), csvNum(c.netMarginPercent, 1),
