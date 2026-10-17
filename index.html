@@ -1139,6 +1139,7 @@
 
     var netMargin = price - totalCost;
     var netMarginPercent = price > 0 ? (netMargin / price * 100) : null;
+    var marginPerHour = totalPrintTime > 0 ? (netMargin / totalPrintTime) : null;
 
     var fixedCosts = materialCost + energyCost + laborCost + packaging + accessories + extrasCost;
     var targetMargin = parseNum(s.targetMargin);
@@ -1153,7 +1154,7 @@
       laborCostPercent: laborCostPercent,
       packagingPercent: packagingPercent, accessoriesPercent: accessoriesPercent,
       netMargin: netMargin, netMarginPercent: netMarginPercent, minPrice: minPrice,
-      amortization: amortization
+      amortization: amortization, totalPrintTime: totalPrintTime, marginPerHour: marginPerHour
     };
   }
 
@@ -1190,6 +1191,7 @@
     { key: "totalCost", label: "Coût total (€)", fmt: formatCurrency },
     { key: "netMargin", label: "Marge nette (€)", fmt: formatCurrency, isMargin: true },
     { key: "netMarginPercent", label: "Marge nette (%)", fmt: formatPercent, isMargin: true },
+    { key: "marginPerHour", label: "Rentabilité (€/h machine)", fmt: formatCurrency, isMargin: true },
     { key: "minPrice", label: "Prix min. cible (€)", fmt: formatCurrency }
   ];
 
@@ -1494,7 +1496,7 @@
     var isSelection = selectedIds.size > 0;
     var list = isSelection ? state.products.filter(function (p) { return selectedIds.has(p.id); }) : state.products;
     var n = list.length;
-    var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, netMargin: 0, packaging: 0, accessories: 0 };
+    var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, netMargin: 0, packaging: 0, accessories: 0, totalPrintTime: 0 };
 
     list.forEach(function (p) {
       var c = computeRow(p);
@@ -1508,12 +1510,15 @@
       sums.netMargin += c.netMargin;
       sums.packaging += parseNum(p.packaging);
       sums.accessories += parseNum(p.accessories);
+      sums.totalPrintTime += c.totalPrintTime;
     });
 
     // Marge % globale = somme des marges € ÷ somme des prix € (et non une
     // moyenne des % individuels) : un article offert à 0 € doit faire
-    // baisser le % global au lieu d'être ignoré du calcul.
+    // baisser le % global au lieu d'être ignoré du calcul. Même logique pour
+    // la rentabilité/h : somme des marges ÷ somme des heures machine.
     var avgMarginPercent = sums.price > 0 ? (sums.netMargin / sums.price * 100) : null;
+    var avgMarginPerHour = sums.totalPrintTime > 0 ? (sums.netMargin / sums.totalPrintTime) : null;
     function sumPct(v) { return sums.totalCost > 0 ? (v / sums.totalCost * 100) : null; }
 
     var totalLabel = isSelection ? "Sélection" : "Total";
@@ -1532,7 +1537,8 @@
     html += '<td class="num tabular cell-detail" data-label="Coût total (€)">' + formatCurrency(sums.totalCost) + "</td>";
     html += '<td class="num tabular" data-label="Marge nette (€)">' + formatCurrency(sums.netMargin) + "</td>";
     html += '<td class="num tabular" data-label="Marge nette (%)"><span class="margin-cell ' + marginClass(avgMarginPercent) + '">' + formatPercent(avgMarginPercent) + " (moy.)</span></td>";
-    html += '<td class="cell-detail"></td><td class="cell-detail"></td>';
+    html += '<td class="num tabular" data-label="Rentabilité (€/h machine)"><span class="margin-cell ' + marginClass(avgMarginPercent) + '">' + formatCurrency(avgMarginPerHour) + "</span></td>";
+    html += '<td class="cell-detail"></td>';
     row.innerHTML = html;
     row.classList.toggle("row-collapsed", !!state.totalsCollapsed);
     updateDiscountRow(sums.price, sums.totalCost, sums.netMargin);
