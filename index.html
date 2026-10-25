@@ -624,6 +624,20 @@
   // ---------------------------------------------------------------------
   // État par défaut
   // ---------------------------------------------------------------------
+  var WORKSHOP_FILAMENT_PRICE = "15";
+  var WORKSHOP_PACKAGING = "2";
+
+  function applyWorkshopProductRules(s, cleanNames) {
+    s.products.forEach(function (p) {
+      p.filamentPrice = WORKSHOP_FILAMENT_PRICE;
+      p.packaging = WORKSHOP_PACKAGING;
+      if (cleanNames && typeof p.name === "string") {
+        p.name = p.name.replace(/\s*\((?:P1S|A1)\)(?=\s*(?:\(copie\)\s*)*$)/i, "").trim();
+      }
+    });
+    return s;
+  }
+
   function defaultState() {
     var etsyId = uid("plat");
     var directId = uid("plat");
@@ -646,8 +660,8 @@
         {
           id: uid("prod"),
           name: embaseTitle("Exemple — Lampe personnalisée", "E27"),
-          price: "45", weight: "205", filamentPrice: "25",
-          printTime: "7", laborTime: "20", packaging: "2", accessories: "8",
+          price: "45", weight: "205", filamentPrice: WORKSHOP_FILAMENT_PRICE,
+          printTime: "7", laborTime: "20", packaging: WORKSHOP_PACKAGING, accessories: "8",
           embaseType: "E27", platformId: etsyId
         }
       ],
@@ -677,7 +691,7 @@
       if (!Array.isArray(parsed.settings.platforms) || parsed.settings.platforms.length === 0) {
         parsed.settings.platforms = defaultState().settings.platforms;
       }
-      return parsed;
+      return applyWorkshopProductRules(parsed, true);
     } catch (e) {
       console.warn("Lecture des données locales impossible, réinitialisation.", e);
       return defaultState();
@@ -689,10 +703,11 @@
   function ensureSalesFields(s) {
     if (!Array.isArray(s.sales)) s.sales = [];
     if (typeof s.salesPanelOpen !== "boolean") s.salesPanelOpen = false;
-    return s;
+    return applyWorkshopProductRules(s, true);
   }
 
   function saveState() {
+    applyWorkshopProductRules(state, false);
     state.savedAt = new Date().toISOString();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -1389,7 +1404,9 @@
         var inputCls = "cell-input tabular" + (isName ? " name-input" : "");
         var type = f.type === "num" ? "text" : "text";
         var inputmode = f.type === "num" ? ' inputmode="decimal"' : "";
-        var inputHtml = '<input type="' + type + '"' + inputmode + ' class="' + inputCls + '" data-id="' + p.id + '" data-field="' + f.key + '" value="' + escapeHtml(p[f.key] || "") + '"' + lockAttr + '>';
+        var isWorkshopCost = f.key === "filamentPrice" || f.key === "packaging";
+        var fieldLockAttr = isWorkshopCost ? ' readonly title="Base atelier fixe : filament 15 €/kg, emballage 2 € par produit"' : lockAttr;
+        var inputHtml = '<input type="' + type + '"' + inputmode + ' class="' + inputCls + '" data-id="' + p.id + '" data-field="' + f.key + '" value="' + escapeHtml(p[f.key] || "") + '"' + fieldLockAttr + '>';
         if (f.percentKey) {
           inputHtml = '<div class="input-with-pct">' + inputHtml + '<span class="cost-percent" id="pct_' + f.key + '_' + p.id + '">' + formatPercent(c[f.percentKey]) + "</span></div>";
         }
@@ -1863,8 +1880,8 @@
 
   document.getElementById("btnAddRow").addEventListener("click", function () {
     state.products.push({
-      id: uid("prod"), name: "Nouveau produit", price: "0", weight: "0", filamentPrice: "0",
-      printTime: "0", laborTime: "0", packaging: "0", accessories: "0",
+      id: uid("prod"), name: "Nouveau produit", price: "0", weight: "0", filamentPrice: WORKSHOP_FILAMENT_PRICE,
+      printTime: "0", laborTime: "0", packaging: WORKSHOP_PACKAGING, accessories: "0",
       platformId: state.settings.platforms[0].id, extras: []
     });
     saveState();
