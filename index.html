@@ -625,12 +625,19 @@
   // État par défaut
   // ---------------------------------------------------------------------
   var WORKSHOP_FILAMENT_PRICE = "15";
-  var WORKSHOP_PACKAGING = "2";
+  // Emballage : valeur par défaut des nouveaux produits, modifiable produit par produit (Benjamin, 31/10/2026).
+  var WORKSHOP_PACKAGING = "1.5";
 
   function applyWorkshopProductRules(s, cleanNames) {
+    // Passage unique de l'ancienne base fixe (2 €) à 1,5 € ; ensuite les valeurs saisies sont conservées.
+    var migratePackaging = s.packagingBase !== WORKSHOP_PACKAGING;
+    s.packagingBase = WORKSHOP_PACKAGING;
     s.products.forEach(function (p) {
       p.filamentPrice = WORKSHOP_FILAMENT_PRICE;
-      p.packaging = WORKSHOP_PACKAGING;
+      if (p.packaging === undefined || p.packaging === null || String(p.packaging).trim() === "" ||
+          (migratePackaging && String(p.packaging).trim() === "2")) {
+        p.packaging = WORKSHOP_PACKAGING;
+      }
       if (cleanNames && typeof p.name === "string") {
         p.name = p.name.replace(/\s*\((?:P1S|A1)\)(?=\s*(?:\(copie\)\s*)*$)/i, "").trim();
       }
@@ -1404,8 +1411,8 @@
         var inputCls = "cell-input tabular" + (isName ? " name-input" : "");
         var type = f.type === "num" ? "text" : "text";
         var inputmode = f.type === "num" ? ' inputmode="decimal"' : "";
-        var isWorkshopCost = f.key === "filamentPrice" || f.key === "packaging";
-        var fieldLockAttr = isWorkshopCost ? ' readonly title="Base atelier fixe : filament 15 €/kg, emballage 2 € par produit"' : lockAttr;
+        var isWorkshopCost = f.key === "filamentPrice";
+        var fieldLockAttr = isWorkshopCost ? ' readonly title="Base atelier fixe : filament 15 €/kg"' : lockAttr;
         var inputHtml = '<input type="' + type + '"' + inputmode + ' class="' + inputCls + '" data-id="' + p.id + '" data-field="' + f.key + '" value="' + escapeHtml(p[f.key] || "") + '"' + fieldLockAttr + '>';
         if (f.percentKey) {
           inputHtml = '<div class="input-with-pct">' + inputHtml + '<span class="cost-percent" id="pct_' + f.key + '_' + p.id + '">' + formatPercent(c[f.percentKey]) + "</span></div>";
