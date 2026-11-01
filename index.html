@@ -1179,6 +1179,8 @@
     return {
       materialCost: materialCost, energyCost: energyCost, platformCost: platformCost,
       socialCost: socialCost, laborCost: laborCost, totalCost: totalCost,
+      // Part des coûts proportionnelle au prix (commission % + cotisations) : baisse avec une réduction.
+      priceLinkedCost: price * platformPercent / 100 + socialCost,
       materialCostPercent: materialCostPercent, energyCostPercent: energyCostPercent,
       platformCostPercent: platformCostPercent, socialCostPercent: socialCostPercent,
       laborCostPercent: laborCostPercent,
@@ -1534,7 +1536,7 @@
     var isSelection = selectedIds.size > 0;
     var list = isSelection ? state.products.filter(function (p) { return selectedIds.has(p.id); }) : state.products;
     var n = list.length;
-    var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, netMargin: 0, packaging: 0, accessories: 0, totalPrintTime: 0 };
+    var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, priceLinkedCost: 0, netMargin: 0, packaging: 0, accessories: 0, totalPrintTime: 0 };
 
     list.forEach(function (p) {
       var c = computeRow(p);
@@ -1545,6 +1547,7 @@
       sums.socialCost += c.socialCost;
       sums.laborCost += c.laborCost;
       sums.totalCost += c.totalCost;
+      sums.priceLinkedCost += c.priceLinkedCost;
       sums.netMargin += c.netMargin;
       sums.packaging += parseNum(p.packaging);
       sums.accessories += parseNum(p.accessories);
@@ -1579,20 +1582,21 @@
     html += '<td class="cell-detail"></td>';
     row.innerHTML = html;
     row.classList.toggle("row-collapsed", !!state.totalsCollapsed);
-    updateDiscountRow(sums.price, sums.totalCost, sums.netMargin);
+    updateDiscountRow(sums.price, sums.totalCost, sums.netMargin, sums.priceLinkedCost);
   }
 
   // Simulation d'une réduction (%) appliquée au prix de vente du Total (ou
   // de la Sélection) : ne modifie aucune donnée produit, affiche juste
-  // l'impact sur la marge nette restante.
-  function updateDiscountRow(price, totalCost, netMargin) {
+  // l'impact sur la marge nette restante. La commission (%) et les cotisations
+  // URSSAF baissent avec le prix (Benjamin, 01/11/2026).
+  function updateDiscountRow(price, totalCost, netMargin, priceLinkedCost) {
     var input = document.getElementById("discountPercent");
     var pct = input ? parseNum(input.value) : 0;
     if (pct < 0) pct = 0;
     if (pct > 100) pct = 100;
 
     var discountedPrice = price * (1 - pct / 100);
-    var discountedMargin = discountedPrice - totalCost;
+    var discountedMargin = discountedPrice - (totalCost - (priceLinkedCost || 0) * pct / 100);
     var discountedMarginPercent = discountedPrice > 0 ? (discountedMargin / discountedPrice * 100) : null;
     var impact = discountedMargin - netMargin;
 
