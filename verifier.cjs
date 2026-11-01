@@ -28,6 +28,12 @@ for (let i = 0; i < loaded.products.length; i++) {
   assert(!/\((P1S|A1)\)$/.test(p.name));
 }
 assert.deepEqual(loaded.sales, source.sales);
+// Cotisations URSSAF : passage unique 12,3 -> 13,4 %, puis la saisie est conservée ; défaut 13,4 %.
+assert.equal(source.settings.socialChargeRate, '12,3');
+assert.equal(loaded.settings.socialChargeRate, '13,4');
+assert.equal(context.defaultState().settings.socialChargeRate, '13,4');
+const taux = context.applyWorkshopProductRules({settings: {socialChargeRate: '14'}, products: [], socialRateBase: '13,4'}, true);
+assert.equal(taux.settings.socialChargeRate, '14');
 // Import / sync Drive d'un fichier ancienne base : même résultat.
 const imported = context.ensureSalesFields(JSON.parse(JSON.stringify(source)));
 assert.deepEqual(imported.products, loaded.products);

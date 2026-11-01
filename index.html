@@ -500,7 +500,7 @@
           <div class="readonly" id="s_amortDisplay">—</div>
         </div>
         <div class="field">
-          <label for="s_socialChargeRate">Cotisations sociales micro-entreprise (%)</label>
+          <label for="s_socialChargeRate">Cotisations URSSAF micro-entreprise (%)</label>
           <input type="text" inputmode="decimal" id="s_socialChargeRate" data-setting="socialChargeRate">
         </div>
         <div class="field">
@@ -627,8 +627,15 @@
   var WORKSHOP_FILAMENT_PRICE = "15";
   // Emballage : valeur par défaut des nouveaux produits, modifiable produit par produit (Benjamin, 31/10/2026).
   var WORKSHOP_PACKAGING = "1.5";
+  // Cotisations URSSAF micro-entreprise vente BIC : 12,3 % + 1 % versement libératoire + 0,1 % CFP (Benjamin, 01/11/2026).
+  var WORKSHOP_SOCIAL_RATE = "13,4";
 
   function applyWorkshopProductRules(s, cleanNames) {
+    // Passage unique de l'ancien taux (12,3 %) à 13,4 % ; ensuite la valeur saisie est conservée.
+    if (s.settings && s.socialRateBase !== WORKSHOP_SOCIAL_RATE) {
+      s.settings.socialChargeRate = WORKSHOP_SOCIAL_RATE;
+      s.socialRateBase = WORKSHOP_SOCIAL_RATE;
+    }
     // Passage unique de l'ancienne base fixe (2 €) à 1,5 € ; ensuite les valeurs saisies sont conservées.
     var migratePackaging = s.packagingBase !== WORKSHOP_PACKAGING;
     s.packagingBase = WORKSHOP_PACKAGING;
@@ -654,7 +661,7 @@
         printerPower: "150",
         printerPrice: "800",
         printerLifetime: "5000",
-        socialChargeRate: "12,3",
+        socialChargeRate: WORKSHOP_SOCIAL_RATE,
         laborRate: "15",
         failureRate: "5",
         targetMargin: "30",
@@ -677,7 +684,8 @@
       totalsCollapsed: true,
       settingsPanelOpen: true,
       sales: [],
-      salesPanelOpen: false
+      salesPanelOpen: false,
+      socialRateBase: WORKSHOP_SOCIAL_RATE
     };
   }
 
@@ -1208,7 +1216,7 @@
     { key: "materialCost", label: "Coût matière (€)", fmt: formatCurrency, percentKey: "materialCostPercent" },
     { key: "energyCost", label: "Élec. + amort. (€)", fmt: formatCurrency, percentKey: "energyCostPercent" },
     { key: "platformCost", label: "Coût plateforme (€)", fmt: formatCurrency, percentKey: "platformCostPercent" },
-    { key: "socialCost", label: "Cotisations (€)", fmt: formatCurrency, percentKey: "socialCostPercent" },
+    { key: "socialCost", label: "Cotisations URSSAF (€)", fmt: formatCurrency, percentKey: "socialCostPercent" },
     { key: "laborCost", label: "Main d'œuvre (€)", fmt: formatCurrency, percentKey: "laborCostPercent" },
     { key: "totalCost", label: "Coût total (€)", fmt: formatCurrency },
     { key: "netMargin", label: "Marge nette (€)", fmt: formatCurrency, isMargin: true },
@@ -1556,7 +1564,7 @@
     html += '<td class="num tabular cell-detail" data-label="Coût matière (€)">' + formatCurrency(sums.materialCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.materialCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Élec. + amort. (€)">' + formatCurrency(sums.energyCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.energyCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Coût plateforme (€)">' + formatCurrency(sums.platformCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.platformCost)) + "</span></td>";
-    html += '<td class="num tabular cell-detail" data-label="Cotisations (€)">' + formatCurrency(sums.socialCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.socialCost)) + "</span></td>";
+    html += '<td class="num tabular cell-detail" data-label="Cotisations URSSAF (€)">' + formatCurrency(sums.socialCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.socialCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Main d\'œuvre (€)">' + formatCurrency(sums.laborCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.laborCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Coût total (€)">' + formatCurrency(sums.totalCost) + "</td>";
     html += '<td class="num tabular" data-label="Marge nette (€)">' + formatCurrency(sums.netMargin) + "</td>";
@@ -1973,8 +1981,8 @@
     var hint = document.getElementById("saleModeHint");
     if (hint) {
       hint.textContent = mode === "perso"
-        ? "Mode « Vente directe perso » : la commission de plateforme et les cotisations sociales sont ignorées sur toutes les lignes, quel que soit le profil de plateforme choisi."
-        : "Mode « Vente pro » : la commission (selon le profil de plateforme de chaque ligne) et les cotisations sociales micro-entreprise s'appliquent normalement.";
+        ? "Mode « Vente directe perso » : la commission de plateforme et les cotisations URSSAF sont ignorées sur toutes les lignes, quel que soit le profil de plateforme choisi."
+        : "Mode « Vente pro » : la commission (selon le profil de plateforme de chaque ligne) et les cotisations URSSAF micro-entreprise s'appliquent normalement.";
     }
     recomputeAllRows();
   }
