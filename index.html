@@ -1212,11 +1212,17 @@
     { key: "platformId", label: "Plateforme", type: "select", optionsFn: function (p) { return platformOptionsHtml(p.platformId); } }
   ];
 
+  // Le taux appliqué est affiché dans le libellé (Benjamin, 01/11/2026).
+  function socialCostLabel() {
+    var rate = String(state.settings.socialChargeRate || "").trim().replace(".", ",");
+    return "Cotisations URSSAF " + (rate ? rate + " % " : "") + "(€)";
+  }
+
   var COMPUTED_FIELDS = [
     { key: "materialCost", label: "Coût matière (€)", fmt: formatCurrency, percentKey: "materialCostPercent" },
     { key: "energyCost", label: "Élec. + amort. (€)", fmt: formatCurrency, percentKey: "energyCostPercent" },
     { key: "platformCost", label: "Coût plateforme (€)", fmt: formatCurrency, percentKey: "platformCostPercent" },
-    { key: "socialCost", label: "Cotisations URSSAF (€)", fmt: formatCurrency, percentKey: "socialCostPercent" },
+    { key: "socialCost", get label() { return socialCostLabel(); }, fmt: formatCurrency, percentKey: "socialCostPercent" },
     { key: "laborCost", label: "Main d'œuvre (€)", fmt: formatCurrency, percentKey: "laborCostPercent" },
     { key: "totalCost", label: "Coût total (€)", fmt: formatCurrency },
     { key: "netMargin", label: "Marge nette (€)", fmt: formatCurrency, isMargin: true },
@@ -1564,7 +1570,7 @@
     html += '<td class="num tabular cell-detail" data-label="Coût matière (€)">' + formatCurrency(sums.materialCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.materialCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Élec. + amort. (€)">' + formatCurrency(sums.energyCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.energyCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Coût plateforme (€)">' + formatCurrency(sums.platformCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.platformCost)) + "</span></td>";
-    html += '<td class="num tabular cell-detail" data-label="Cotisations URSSAF (€)">' + formatCurrency(sums.socialCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.socialCost)) + "</span></td>";
+    html += '<td class="num tabular cell-detail" data-label="' + escapeHtml(socialCostLabel()) + '">' + formatCurrency(sums.socialCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.socialCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Main d\'œuvre (€)">' + formatCurrency(sums.laborCost) + ' <span class="cost-percent">' + formatPercent(sumPct(sums.laborCost)) + "</span></td>";
     html += '<td class="num tabular cell-detail" data-label="Coût total (€)">' + formatCurrency(sums.totalCost) + "</td>";
     html += '<td class="num tabular" data-label="Marge nette (€)">' + formatCurrency(sums.netMargin) + "</td>";
@@ -1751,6 +1757,7 @@
       state.settings[input.getAttribute("data-setting")] = input.value;
       saveState();
       recomputeAllRows();
+      if (input.getAttribute("data-setting") === "socialChargeRate") { renderHead(); renderBody(); }
     });
   });
 
