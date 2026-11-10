@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<!--
+  L'Atelier Baradel — Rentabilité, version 2 (onglets), 11/11/2026.
+  Page GÉNÉRÉE par construire_v2.py à partir de ce gabarit : le calcul (computeRow), le stockage
+  (clé impression3d_rentabilite_v1) et la synchro Google Drive sont recopiés MOT POUR MOT depuis
+  ../index.html (version 1). Les deux versions lisent et écrivent le même fichier de données.
+  Ne pas modifier v2/index.html à la main : modifier ce gabarit ou index.html puis relancer
+  python -I construire_v2.py.
+-->
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier Baradel — Rentabilité v2</title>
+<meta name="theme-color" content="#161513">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --bg: #f6f4f0; --surface: #ffffff; --surface-2: #f0ede7; --text: #1f1d1a; --soft: #6b665e; --line: #e2ddd4;
+  --accent: #b5793a; --accent-bg: #f6ead9; --on-accent: #ffffff;
+  --green: #2f7d4f; --green-bg: #e3f2e8; --orange: #a86200; --orange-bg: #fbecd5; --red: #b3261e; --red-bg: #fbe3e1;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161513; --surface: #201e1b; --surface-2: #2a2724; --text: #f1ede6; --soft: #a59f95; --line: #36322d;
+  --accent: #e0a463; --accent-bg: #3a2c1d; --on-accent: #1a1a1a;
+  --green: #6fcf97; --green-bg: #1d3326; --orange: #f2b45c; --orange-bg: #3a2c16; --red: #ff8a80; --red-bg: #3d1f1d;
+  color-scheme: dark;
+}}
+:root[data-theme="dark"] {
+  --bg: #161513; --surface: #201e1b; --surface-2: #2a2724; --text: #f1ede6; --soft: #a59f95; --line: #36322d;
+  --accent: #e0a463; --accent-bg: #3a2c1d; --on-accent: #1a1a1a;
+  --green: #6fcf97; --green-bg: #1d3326; --orange: #f2b45c; --orange-bg: #3a2c16; --red: #ff8a80; --red-bg: #3d1f1d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { max-width: 100%; overflow-x: hidden; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+body.fiche-ouverte { overflow: hidden; }
+.app { max-width: 1100px; margin: 0 auto; padding: 0 16px 90px; }
+header.top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 10px; gap: 12px; flex-wrap: wrap; }
+.brand { font-weight: 700; letter-spacing: .02em; }
+.brand small { display: block; font-weight: 400; color: var(--soft); font-size: 12px; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge { font-size: 11px; background: var(--accent-bg); color: var(--accent); padding: 3px 8px; border-radius: 99px; font-weight: 600; }
+.badge.perso { background: var(--orange-bg); color: var(--orange); }
+.drive-status { font-size: 12.5px; color: var(--soft); margin: -4px 0 10px; }
+.drive-status.error { color: var(--red); }
+.storage-warning { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); padding: 10px 14px; border-radius: 10px; margin: 10px 0; font-size: 13.5px; font-weight: 600; }
+nav.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 18px; }
+nav.tabs button { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--soft); padding: 9px 6px; border-radius: 9px; font: inherit; font-weight: 600; cursor: pointer; }
+nav.tabs button.on { background: var(--accent-bg); color: var(--accent); }
+.tab { display: none; } .tab.on { display: block; }
+.grid-kpi { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.kpi .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi .l { color: var(--soft); font-size: 12.5px; }
+.kpi.alerte .v { color: var(--red); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; min-width: 0; }
+.card h3 { margin: 0 0 10px; font-size: 15px; }
+.cols2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.ligne-simple { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.ligne-simple:first-child { border-top: 0; }
+.ligne-simple > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.lien { all: unset; cursor: pointer; font-weight: 600; }
+.lien:hover { color: var(--accent); }
+.soft { color: var(--soft); font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill.green { color: var(--green); background: var(--green-bg); } .pill.orange { color: var(--orange); background: var(--orange-bg); } .pill.red { color: var(--red); background: var(--red-bg); } .pill.neutral { color: var(--soft); }
+.btn { border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.prim { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.alerte { color: var(--red); background: var(--red-bg); border-color: var(--red); font-weight: 600; }
+.btn.danger { color: var(--red); }
+.btn.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.connected { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+.outils { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.outils input[type=search] { flex: 1 1 200px; min-width: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; }
+.outils select, .vendu select { padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; max-width: 100%; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--soft); border-radius: 99px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.chip.on { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.liste { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.liste .tete, .liste .prod { display: grid; grid-template-columns: minmax(0, 2.6fr) 1fr 1fr 1fr 1.1fr; gap: 10px; align-items: center; padding: 11px 14px; }
+.liste .tete { font-size: 12px; color: var(--soft); background: var(--surface-2); font-weight: 600; }
+.liste .prod { border-top: 1px solid var(--line); cursor: pointer; }
+.liste .prod:hover { background: var(--surface-2); }
+.liste .prod.sel { background: var(--accent-bg); }
+.prod .c-nom { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.prod .c-nom > div { min-width: 0; }
+.prod input.row-select { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; margin: 0; }
+.prod .nom { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prod .cat { color: var(--soft); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prod .r, .tete .r { text-align: right; }
+.min-bas { color: var(--red); font-weight: 600; }
+.vide { padding: 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.stat { background: var(--surface-2); border-radius: 9px; padding: 9px 11px; min-width: 0; }
+.stat .l { font-size: 12px; color: var(--soft); }
+.stat .v { font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; margin: 10px 0 6px; }
+.remise { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 10px; }
+.remise label { font-weight: 600; font-size: 13.5px; display: flex; gap: 8px; align-items: center; }
+.remise input { width: 70px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; text-align: right; }
+.impact-negative { color: var(--red); font-weight: 600; }
+/* Fiche produit (panneau latéral) */
+.voile { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; z-index: 10; }
+.voile.on { display: block; }
+.fiche { position: fixed; top: 0; right: 0; bottom: 0; width: min(580px, 100%); background: var(--bg); z-index: 11; overflow-y: auto; overflow-x: hidden; transform: translateX(100%); visibility: hidden; transition: transform .2s, visibility .2s; padding: 16px 16px 40px; border-left: 1px solid var(--line); }
+.fiche.on { transform: none; visibility: visible; }
+.fiche-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.fiche-tete > div { flex: 1; min-width: 0; }
+.fiche-tete input.titre { width: 100%; font: inherit; font-size: 18px; font-weight: 700; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 3px 6px; margin-left: -6px; }
+.fiche-tete input.titre:hover, .fiche-tete input.titre:focus { border-color: var(--line); background: var(--surface); outline: none; }
+.champs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.champs label { font-size: 12px; color: var(--soft); display: block; }
+.champs input, .champs select { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; font-variant-numeric: tabular-nums; }
+.champs input[readonly] { background: var(--surface-2); color: var(--soft); }
+.champs input:focus, .champs select:focus, .extra input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.champs .pct { font-size: 11px; color: var(--soft); }
+.extra { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)) auto; gap: 6px; align-items: end; margin-bottom: 8px; }
+.extra label { font-size: 11px; color: var(--soft); display: block; }
+.extra input { width: 100%; min-width: 0; padding: 6px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; font-size: 13.5px; }
+.depenses { display: grid; grid-template-columns: minmax(80px, 128px) minmax(0, 1fr) auto auto; gap: 7px 10px; align-items: center; font-size: 13px; }
+.depenses .piste { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+.depenses .piste i { display: block; height: 100%; border-radius: 6px; background: var(--orange); }
+.depenses .piste i.top { background: var(--red); }
+.depenses .piste i.marge { background: var(--green); }
+.depenses b, .depenses em { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.depenses em { font-style: normal; color: var(--soft); min-width: 36px; }
+.depenses .sep { grid-column: 1 / -1; border-top: 1px solid var(--line); margin: 2px 0; }
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.compare .plat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-width: 0; }
+.compare .plat.best { border-color: var(--green); }
+.compare .plat h4 { margin: 0 0 6px; font-size: 13px; overflow-wrap: anywhere; }
+.compare .plat .m { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.compare .plat .d { font-size: 12px; color: var(--soft); }
+.simu input[type=range] { width: 100%; accent-color: var(--accent); }
+.vendu { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+.note { font-size: 12.5px; color: var(--soft); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+.reglages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.reglages .large { grid-column: 1 / -1; }
+.reglages .champs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.plat-row { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 8px; }
+.sale-row { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto auto auto auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.sale-row:first-child { border-top: 0; }
+.sale-name { font-weight: 600; overflow-wrap: anywhere; }
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 10px; font-size: 14px; z-index: 20; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100% - 32px); }
+.toast.on { opacity: 1; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 760px) {
+  .grid-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi .v { font-size: 20px; }
+  .cols2, .reglages { grid-template-columns: minmax(0, 1fr); }
+  nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-width: 1px 0 0; z-index: 9; padding: 6px 6px 10px; }
+  nav.tabs button { font-size: 12px; padding: 8px 2px; }
+  .liste .tete { display: none; }
+  .liste .prod { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom marge" "infos site"; row-gap: 4px; }
+  .prod .c-nom { grid-area: nom; } .prod .c-marge { grid-area: marge; } .prod .c-site { grid-area: site; }
+  .prod .c-prix { grid-area: infos; text-align: left; color: var(--soft); font-size: 13px; padding-left: 28px; }
+  .prod .c-min { display: none; }
+  .prod .c-marge .pill::before { content: "Marge "; font-weight: 400; }
+  .prod .c-site .pill::before { content: "Site "; font-weight: 400; }
+  .champs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .extra { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .extra .e-nom { grid-column: 1 / -1; }
+  .plat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plat-row .p-nom { grid-column: 1 / -2; }
+  .compare .plat .m { font-size: 17px; }
+  .sale-row { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .sale-name { flex: 1 1 100%; order: -1; }
+  .toast { bottom: 80px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">L'Atelier Baradel <small>Rentabilité de tes créations imprimées en 3D</small></div>
+    <div class="badges"><span class="badge perso visually-hidden" id="badgePerso">Mode vente directe</span><span class="badge">Version 2 — essai</span></div>
+  </header>
+  <div id="storageWarning" class="storage-warning visually-hidden" role="alert">
+    ⚠️ La sauvegarde automatique ne fonctionne pas sur ce navigateur/appareil : tes modifications ne seront <strong>pas</strong> conservées après fermeture. Utilise « Exporter (JSON) » (onglet Réglages) avant de quitter.
+  </div>
+  <div id="driveStatus" class="drive-status visually-hidden"></div>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="bord">📊 Tableau de bord</button>
+    <button data-tab="produits">🧾 Produits</button>
+    <button data-tab="ventes">📈 Ventes</button>
+    <button data-tab="reglages">⚙ Réglages</button>
+  </nav>
+
+  <section class="tab" id="t-bord">
+    <div class="grid-kpi" id="kpis"></div>
+    <div class="cols2">
+      <div class="card"><h3>⚠ À corriger</h3><div id="aCorriger"></div></div>
+      <div class="card"><h3>🏆 Les plus rentables (€ par heure machine)</h3><div id="top"></div></div>
+    </div>
+    <div class="card"><h3>💡 Ce que le site te rapporte en plus (par vente, même prix)</h3><div id="gainSite"></div></div>
+  </section>
+
+  <section class="tab" id="t-produits">
+    <div class="outils">
+      <input type="search" id="recherche" placeholder="Rechercher un produit…" aria-label="Rechercher un produit">
+      <select id="tri" aria-label="Trier par">
+        <option value="">Trier : ordre d'origine</option>
+        <option value="name">Trier : nom</option>
+        <option value="price">Trier : prix</option>
+        <option value="netMargin">Trier : marge (€)</option>
+        <option value="netMarginPercent">Trier : marge (%)</option>
+        <option value="siteMargin">Trier : marge site</option>
+        <option value="marginPerHour">Trier : € par heure</option>
+        <option value="minPrice">Trier : prix min.</option>
+        <option value="totalCost">Trier : coût total</option>
+        <option value="weight">Trier : poids</option>
+        <option value="printTime">Trier : temps d'impression</option>
+      </select>
+      <button class="btn" id="triSens" title="Inverser l'ordre">↓</button>
+      <button class="btn prim" id="btnAddRow">+ Produit</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="liste">
+      <div class="tete"><div>Produit <span class="soft">(coche pour un total partiel)</span></div><div class="r">Prix</div><div class="r">Marge</div><div class="r">Marge site</div><div class="r">Prix min.</div></div>
+      <div id="lignes"></div>
+    </div>
+    <div class="card" id="totaux">
+      <div id="totauxDyn"></div>
+      <div class="remise">
+        <label for="discountPercent">Simulation de réduction (%) <input type="text" inputmode="decimal" id="discountPercent" placeholder="0" value=""></label>
+        <span class="soft">Prix : <b class="num" id="discountPrice">—</b></span>
+        <span class="soft">Marge : <b class="num" id="discountMargin">—</b> <span id="discountMarginPercent"></span></span>
+        <span class="soft">Impact : <b class="num" id="discountImpact">—</b></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-ventes">
+    <div class="grid-kpi" id="salesStats"></div>
+    <div class="card"><h3>Historique <span class="soft" id="salesSummaryBadge"></span></h3><div id="salesList"></div></div>
+  </section>
+
+  <section class="tab" id="t-reglages">
+    <div class="reglages">
+      <div class="card"><h3>🖨 Imprimante</h3><div class="champs">
+        <div><label for="s_printerPrice">Prix d'achat (€)</label><input type="text" inputmode="decimal" id="s_printerPrice" data-setting="printerPrice"></div>
+        <div><label for="s_printerLifetime">Durée de vie (h)</label><input type="text" inputmode="decimal" id="s_printerLifetime" data-setting="printerLifetime"></div>
+        <div><label for="s_printerPower">Puissance moyenne (W)</label><input type="text" inputmode="decimal" id="s_printerPower" data-setting="printerPower"></div>
+        <div><label for="s_kwhPrice">Prix du kWh (€)</label><input type="text" inputmode="decimal" id="s_kwhPrice" data-setting="kwhPrice"></div>
+      </div><p class="soft" style="margin:8px 0 0">Usure de la machine : <b id="s_amortDisplay">—</b></p></div>
+      <div class="card"><h3>💶 Entreprise</h3><div class="champs">
+        <div><label for="s_socialChargeRate">Cotisations URSSAF (%)</label><input type="text" inputmode="decimal" id="s_socialChargeRate" data-setting="socialChargeRate"></div>
+        <div><label for="s_targetMargin">Marge nette cible (%)</label><input type="text" inputmode="decimal" id="s_targetMargin" data-setting="targetMargin"></div>
+        <div><label for="s_laborRate">Taux horaire main d'œuvre (€/h)</label><input type="text" inputmode="decimal" id="s_laborRate" data-setting="laborRate"></div>
+        <div><label for="s_failureRate">Échecs d'impression (%)</label><input type="text" inputmode="decimal" id="s_failureRate" data-setting="failureRate"></div>
+      </div></div>
+      <div class="card large"><h3>🛒 Plateformes de vente (frais)</h3><div id="platformsList"></div><button class="btn" id="btnAddPlatform">+ Ajouter une plateforme</button>
+        <p class="soft" style="margin:8px 0 0">Une plateforme dont le nom commence par « Site » sert au calcul « marge si vendu sur le site ».</p></div>
+      <div class="card"><h3>🧮 Mode de vente</h3>
+        <div class="outils" role="group" aria-label="Mode de vente"><button class="btn" data-sale-mode="pro">Vente pro (Etsy / site)</button><button class="btn" data-sale-mode="perso">Vente directe (perso)</button></div>
+        <p class="soft" id="saleModeHint" style="margin:0"></p></div>
+      <div class="card"><h3>☁ Sauvegarde</h3>
+        <div class="outils"><button class="btn" id="btnDriveConnect">☁ Connecter Google Drive</button><button class="btn visually-hidden" id="btnDriveSyncNow">🔄 Synchroniser maintenant</button></div>
+        <div class="outils"><button class="btn" id="btnExportJson">⬇ Exporter (JSON)</button><button class="btn" id="btnImportJson">⬆ Importer (JSON)</button></div>
+        <input type="file" id="fileImport" accept="application/json" class="visually-hidden">
+        <p class="soft" style="margin:0">Données enregistrées dans ce navigateur et, si connecté, sur Google Drive (même fichier que la version 1).</p></div>
+      <div class="card"><h3>🎨 Affichage</h3>
+        <div class="outils" role="group" aria-label="Thème"><button class="btn" data-theme-choice="auto">Auto</button><button class="btn" data-theme-choice="light">Clair</button><button class="btn" data-theme-choice="dark">Sombre</button></div>
+        <p class="soft" style="margin:0"><a href="../" style="color:var(--accent)">Revenir à la version 1</a></p></div>
+    </div>
+  </section>
+</div>
+
+<div class="voile" id="voile"></div>
+<aside class="fiche" id="fiche" aria-label="Fiche produit"></aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "impression3d_rentabilite_v1";
+  var THEME_KEY = "impression3d_rentabilite_theme";
+  // Préférences d'affichage propres à la v2 (onglet, tri, filtre) : clé séparée,
+  // pour ne jamais toucher au tri ni aux panneaux de la version 1.
+  var UI_KEY = "impression3d_rentabilite_v2_ui";
+
+  // ---------------------------------------------------------------------
+  // Helpers numériques / formatage (recopiés de la version 1)
+  // ---------------------------------------------------------------------
+  function parseNum(v) {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === "number") return isNaN(v) ? 0 : v;
+    var s = String(v).trim().replace(/\s/g, "").replace(",", ".");
+    if (s === "") return 0;
+    var n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function formatCurrency(n) {
+    if (n === null || n === undefined || isNaN(n) || !isFinite(n)) return "—";
+    return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatPercent(n, decimals) {
+    if (decimals === undefined) decimals = 1;
+    if (n === null || n === undefined || isNaN(n) || !isFinite(n)) return "—";
+    return n.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %";
+  }
+
+  function formatNumberPlain(n, decimals) {
+    if (decimals === undefined) decimals = 2;
+    if (n === null || n === undefined || isNaN(n) || !isFinite(n)) return "—";
+    return n.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+
+  function uid(prefix) {
+    if (window.crypto && crypto.randomUUID) return prefix + "_" + crypto.randomUUID();
+    return prefix + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---------------------------------------------------------------------
+  // État par défaut
+  // ---------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------
+  // État, chargement, migrations, sauvegarde (recopiés de la version 1)
+  // ---------------------------------------------------------------------
+  var WORKSHOP_FILAMENT_PRICE = "15";
+  // Emballage : valeur par défaut des nouveaux produits, modifiable produit par produit (Benjamin, 31/10/2026).
+  var WORKSHOP_PACKAGING = "1.5";
+  // Cotisations URSSAF micro-entreprise vente BIC : 12,3 % + 1 % versement libératoire + 0,1 % CFP (Benjamin, 01/11/2026).
+  var WORKSHOP_SOCIAL_RATE = "13,4";
+
+  function applyWorkshopProductRules(s, cleanNames) {
+    // Passage unique de l'ancien taux (12,3 %) à 13,4 % ; ensuite la valeur saisie est conservée.
+    if (s.settings && s.socialRateBase !== WORKSHOP_SOCIAL_RATE) {
+      s.settings.socialChargeRate = WORKSHOP_SOCIAL_RATE;
+      s.socialRateBase = WORKSHOP_SOCIAL_RATE;
+    }
+    // Passage unique de l'ancienne base fixe (2 €) à 1,5 € ; ensuite les valeurs saisies sont conservées.
+    var migratePackaging = s.packagingBase !== WORKSHOP_PACKAGING;
+    s.packagingBase = WORKSHOP_PACKAGING;
+    s.products.forEach(function (p) {
+      p.filamentPrice = WORKSHOP_FILAMENT_PRICE;
+      if (p.packaging === undefined || p.packaging === null || String(p.packaging).trim() === "" ||
+          (migratePackaging && String(p.packaging).trim() === "2")) {
+        p.packaging = WORKSHOP_PACKAGING;
+      }
+      if (cleanNames && typeof p.name === "string") {
+        p.name = p.name.replace(/\s*\((?:P1S|A1)\)(?=\s*(?:\(copie\)\s*)*$)/i, "").trim();
+      }
+    });
+    return s;
+  }
+
+  function defaultState() {
+    var etsyId = uid("plat");
+    var directId = uid("plat");
+    return {
+      settings: {
+        kwhPrice: "0,25",
+        printerPower: "150",
+        printerPrice: "800",
+        printerLifetime: "5000",
+        socialChargeRate: WORKSHOP_SOCIAL_RATE,
+        laborRate: "15",
+        failureRate: "5",
+        targetMargin: "30",
+        platforms: [
+          { id: etsyId, name: "Etsy", percent: "10", fixed: "0,30" },
+          { id: directId, name: "Vente directe", percent: "0", fixed: "0" }
+        ]
+      },
+      products: [
+        {
+          id: uid("prod"),
+          name: embaseTitle("Exemple — Lampe personnalisée", "E27"),
+          price: "45", weight: "205", filamentPrice: WORKSHOP_FILAMENT_PRICE,
+          printTime: "7", laborTime: "20", packaging: WORKSHOP_PACKAGING, accessories: "8",
+          embaseType: "E27", platformId: etsyId
+        }
+      ],
+      sort: { key: null, dir: 1 },
+      saleMode: "pro",
+      totalsCollapsed: true,
+      settingsPanelOpen: true,
+      sales: [],
+      salesPanelOpen: false,
+      socialRateBase: WORKSHOP_SOCIAL_RATE
+    };
+  }
+
+  var state = loadState();
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      if (!parsed || !parsed.settings || !Array.isArray(parsed.products)) return defaultState();
+      if (!parsed.sort) parsed.sort = { key: null, dir: 1 };
+      if (parsed.saleMode !== "pro" && parsed.saleMode !== "perso") parsed.saleMode = "pro";
+      if (typeof parsed.totalsCollapsed !== "boolean") parsed.totalsCollapsed = true;
+      if (typeof parsed.settingsPanelOpen !== "boolean") parsed.settingsPanelOpen = true;
+      if (!Array.isArray(parsed.sales)) parsed.sales = [];
+      if (typeof parsed.salesPanelOpen !== "boolean") parsed.salesPanelOpen = false;
+      if (!Array.isArray(parsed.settings.platforms) || parsed.settings.platforms.length === 0) {
+        parsed.settings.platforms = defaultState().settings.platforms;
+      }
+      return applyWorkshopProductRules(parsed, true);
+    } catch (e) {
+      console.warn("Lecture des données locales impossible, réinitialisation.", e);
+      return defaultState();
+    }
+  }
+
+  // Appliqué à tout état remplacé en bloc (sync Drive, import JSON) pour
+  // garantir la présence des champs ajoutés après la création du fichier.
+  function ensureSalesFields(s) {
+    if (!Array.isArray(s.sales)) s.sales = [];
+    if (typeof s.salesPanelOpen !== "boolean") s.salesPanelOpen = false;
+    return applyWorkshopProductRules(s, true);
+  }
+
+  function saveState() {
+    applyWorkshopProductRules(state, false);
+    state.savedAt = new Date().toISOString();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      hideStorageWarning();
+    } catch (e) {
+      console.warn("Sauvegarde locale impossible", e);
+      showStorageWarning();
+    }
+    scheduleDriveUpload();
+  }
+
+  // Certains navigateurs mobiles bloquent silencieusement le stockage local
+  // pour les fichiers ouverts en file:// : on le détecte pour prévenir l'utilisateur
+  // au lieu de le laisser croire à tort que tout est sauvegardé.
+  function storageAvailable() {
+    try {
+      var testKey = "__storage_test__";
+      localStorage.setItem(testKey, "1");
+      var ok = localStorage.getItem(testKey) === "1";
+      localStorage.removeItem(testKey);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function showStorageWarning() {
+    var el = document.getElementById("storageWarning");
+    if (el) el.classList.remove("visually-hidden");
+  }
+
+  function hideStorageWarning() {
+    var el = document.getElementById("storageWarning");
+    if (el) el.classList.add("visually-hidden");
+  }
+
+  // ---------------------------------------------------------------------
+  // Synchronisation Google Drive (optionnelle, nécessite internet)
+  // Le fonctionnement local (localStorage) continue de marcher à l'identique
+  // que la synchro soit active ou non : c'est une couche en plus, pas un
+  // remplacement.
+  // ---------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------
+  // Synchronisation Google Drive (recopiée de la version 1)
+  // ---------------------------------------------------------------------
+  var DRIVE_CLIENT_ID = "496863293272-79nmqcudg9rjs3mudld8qkovfo0osp1b.apps.googleusercontent.com";
+  var DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file email";
+  var DRIVE_FILENAME = "rentabilite-3d-data.json";
+  var DRIVE_ENABLED_KEY = "impression3d_drive_enabled";
+  var DRIVE_FILEID_KEY = "impression3d_drive_fileid";
+  var DRIVE_EMAIL_KEY = "impression3d_drive_email";
+
+  var driveTokenClient = null;
+  var driveAccessToken = null;
+  var driveFileId = localStorage.getItem(DRIVE_FILEID_KEY) || null;
+  var driveUploadTimer = null;
+  var driveSyncing = false;
+
+  function setDriveStatus(text, isError) {
+    var el = document.getElementById("driveStatus");
+    if (!el) return;
+    if (!text) { el.classList.add("visually-hidden"); el.textContent = ""; return; }
+    el.textContent = text;
+    el.classList.remove("visually-hidden");
+    el.classList.toggle("error", !!isError);
+  }
+
+  function updateDriveButtonUI() {
+    var btn = document.getElementById("btnDriveConnect");
+    var syncBtn = document.getElementById("btnDriveSyncNow");
+    if (!btn) return;
+    if (driveAccessToken) {
+      btn.textContent = "☁ Drive connecté";
+      btn.classList.add("connected");
+      if (syncBtn) syncBtn.classList.remove("visually-hidden");
+    } else {
+      btn.textContent = "☁ Connecter Google Drive";
+      btn.classList.remove("connected");
+      if (syncBtn) syncBtn.classList.add("visually-hidden");
+    }
+  }
+
+  function driveApiFetch(url, options) {
+    options = options || {};
+    options.headers = Object.assign({}, options.headers, { Authorization: "Bearer " + driveAccessToken });
+    return fetch(url, options);
+  }
+
+  function driveFindFile() {
+    var q = encodeURIComponent("name='" + DRIVE_FILENAME + "' and trashed=false");
+    return driveApiFetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,modifiedTime)&spaces=drive")
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.files && data.files.length > 0) return data.files[0].id;
+        return null;
+      });
+  }
+
+  function driveCreateFile(content) {
+    return driveApiFetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: DRIVE_FILENAME, mimeType: "application/json" })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (meta) {
+        return driveApiFetch("https://www.googleapis.com/upload/drive/v3/files/" + meta.id + "?uploadType=media", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: content
+        }).then(function () { return meta.id; });
+      });
+  }
+
+  function driveDownloadFile(fileId) {
+    return driveApiFetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media")
+      .then(function (r) { return r.ok ? r.text() : null; });
+  }
+
+  function driveUploadFile(fileId, content) {
+    return driveApiFetch("https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: content
+    });
+  }
+
+  // Au premier lien : trouve ou crée le fichier sur Drive, compare avec
+  // la version locale via l'horodatage "savedAt", et garde la plus récente.
+  function driveInitialSync() {
+    setDriveStatus("☁ Synchronisation…");
+    driveSyncing = true;
+    driveFindFile()
+      .then(function (foundId) {
+        if (foundId) {
+          driveFileId = foundId;
+          localStorage.setItem(DRIVE_FILEID_KEY, foundId);
+          return driveDownloadFile(foundId).then(function (text) {
+            var remote = null;
+            try { remote = text ? JSON.parse(text) : null; } catch (e) { remote = null; }
+            // La connexion récupère TOUJOURS la version Drive en priorité :
+            // elle ne doit jamais écraser silencieusement le cloud avec une
+            // version locale simplement parce qu'on vient de cliquer "Connecter".
+            if (remote) {
+              state = ensureSalesFields(remote);
+              try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+              renderAll(true);
+            }
+          });
+        } else {
+          return driveCreateFile(JSON.stringify(state)).then(function (newId) {
+            driveFileId = newId;
+            localStorage.setItem(DRIVE_FILEID_KEY, newId);
+          });
+        }
+      })
+      .then(function () {
+        driveSyncing = false;
+        setDriveStatus("☁ Synchronisé avec Google Drive à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + ".");
+      })
+      .catch(function (err) {
+        driveSyncing = false;
+        console.warn("Erreur de synchronisation Drive", err);
+        setDriveStatus("☁ Erreur de synchronisation Drive (voir console).", true);
+      });
+  }
+
+  // Appelé à chaque saveState() : renvoie l'état vers Drive si connecté,
+  // avec un petit délai pour ne pas spammer l'API à chaque frappe.
+  function scheduleDriveUpload() {
+    if (!driveAccessToken || !driveFileId) return;
+    if (driveUploadTimer) clearTimeout(driveUploadTimer);
+    driveUploadTimer = setTimeout(function () {
+      driveUploadFile(driveFileId, JSON.stringify(state))
+        .then(function (r) {
+          if (r && r.ok) {
+            setDriveStatus("☁ Enregistré sur Drive à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + ".");
+          } else {
+            setDriveStatus("☁ Échec de l'envoi vers Drive.", true);
+          }
+        })
+        .catch(function () { setDriveStatus("☁ Échec de l'envoi vers Drive (hors ligne ?).", true); });
+    }, 1500);
+  }
+
+  // Bouton "Synchroniser maintenant" : force l'envoi immédiat vers Drive,
+  // sans attendre le délai habituel, pour avoir une confirmation certaine.
+  function forceDriveSyncNow() {
+    if (!driveAccessToken || !driveFileId) {
+      setDriveStatus("☁ Connectez-vous d'abord à Google Drive.", true);
+      return;
+    }
+    if (driveUploadTimer) { clearTimeout(driveUploadTimer); driveUploadTimer = null; }
+    setDriveStatus("☁ Synchronisation en cours…");
+    driveUploadFile(driveFileId, JSON.stringify(state))
+      .then(function (r) {
+        if (r && r.ok) {
+          setDriveStatus("☁ Enregistré sur Drive à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + ".");
+        } else {
+          setDriveStatus("☁ Échec de l'envoi vers Drive.", true);
+        }
+      })
+      .catch(function () { setDriveStatus("☁ Échec de l'envoi vers Drive (hors ligne ?).", true); });
+  }
+
+  function onDriveTokenReceived(resp) {
+    if (resp && resp.error) {
+      console.warn("Connexion Google refusée", resp);
+      setDriveStatus("☁ Connexion refusée par Google.", true);
+      return;
+    }
+    driveAccessToken = resp.access_token;
+    try { localStorage.setItem(DRIVE_ENABLED_KEY, "1"); } catch (e) {}
+    updateDriveButtonUI();
+    driveInitialSync();
+    startDrivePolling();
+    fetchAndStoreDriveEmail();
+  }
+
+  // Mémorise l'adresse e-mail du compte connecté pour pouvoir la reproposer
+  // automatiquement (login_hint) lors des prochaines connexions, afin que
+  // Google saute l'écran de sélection de compte.
+  function fetchAndStoreDriveEmail() {
+    driveApiFetch("https://www.googleapis.com/oauth2/v3/userinfo")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (info) {
+        if (info && info.email) {
+          try { localStorage.setItem(DRIVE_EMAIL_KEY, info.email); } catch (e) {}
+        }
+      })
+      .catch(function () {});
+  }
+
+  // Vérifie périodiquement si une version plus récente existe sur Drive
+  // (mise à jour depuis un autre appareil) et la charge si besoin, sans
+  // avoir à recharger la page.
+  var drivePollTimer = null;
+
+  function drivePollForUpdates() {
+    if (!driveAccessToken || !driveFileId || driveSyncing) return;
+    driveDownloadFile(driveFileId).then(function (text) {
+      var remote = null;
+      try { remote = text ? JSON.parse(text) : null; } catch (e) { remote = null; }
+      var localTime = state.savedAt ? new Date(state.savedAt).getTime() : 0;
+      var remoteTime = remote && remote.savedAt ? new Date(remote.savedAt).getTime() : 0;
+      if (remote && remoteTime > localTime) {
+        state = ensureSalesFields(remote);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+        renderAll(true);
+        setDriveStatus("☁ Mise à jour reçue depuis un autre appareil.");
+        setTimeout(function () { setDriveStatus(""); }, 4000);
+      }
+    }).catch(function () { /* silencieux, on retentera au prochain cycle */ });
+  }
+
+  function startDrivePolling() {
+    stopDrivePolling();
+    drivePollTimer = setInterval(drivePollForUpdates, 45000);
+  }
+
+  function stopDrivePolling() {
+    if (drivePollTimer) { clearInterval(drivePollTimer); drivePollTimer = null; }
+  }
+
+  function getDriveTokenClient() {
+    if (!driveTokenClient) {
+      var savedEmail = localStorage.getItem(DRIVE_EMAIL_KEY) || "";
+      var config = {
+        client_id: DRIVE_CLIENT_ID,
+        scope: DRIVE_SCOPE,
+        callback: onDriveTokenReceived
+      };
+      if (savedEmail) config.hint = savedEmail;
+      driveTokenClient = google.accounts.oauth2.initTokenClient(config);
+    }
+    return driveTokenClient;
+  }
+
+  function connectDrive() {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) {
+      setDriveStatus("☁ Impossible de contacter Google (vérifiez votre connexion internet).", true);
+      return;
+    }
+    var alreadyConsented = localStorage.getItem(DRIVE_ENABLED_KEY) === "1";
+    getDriveTokenClient().requestAccessToken({ prompt: alreadyConsented ? "" : "consent" });
+  }
+
+  function disconnectDrive() {
+    if (driveAccessToken && window.google && google.accounts && google.accounts.oauth2) {
+      google.accounts.oauth2.revoke(driveAccessToken, function () {});
+    }
+    driveAccessToken = null;
+    stopDrivePolling();
+    try {
+      localStorage.removeItem(DRIVE_ENABLED_KEY);
+      localStorage.removeItem(DRIVE_EMAIL_KEY);
+    } catch (e) {}
+    driveTokenClient = null;
+    updateDriveButtonUI();
+    setDriveStatus("☁ Déconnecté de Google Drive.");
+    setTimeout(function () { setDriveStatus(""); }, 3000);
+  }
+
+  // Reconnexion automatique et silencieuse : grâce à l'adresse e-mail
+  // mémorisée (login_hint), Google sait directement quel compte utiliser
+  // et ne montre ni fenêtre ni sélecteur de compte, même s'il y a plusieurs
+  // comptes Google dans le navigateur.
+  function tryAutoReconnectDrive() {
+    var wantsDrive = localStorage.getItem(DRIVE_ENABLED_KEY) === "1";
+    if (!wantsDrive) return;
+    var waited = 0;
+    var waitForGis = setInterval(function () {
+      waited += 200;
+      if (window.google && google.accounts && google.accounts.oauth2) {
+        clearInterval(waitForGis);
+        try {
+          getDriveTokenClient().requestAccessToken({ prompt: "" });
+        } catch (e) {
+          console.warn("Reconnexion Drive silencieuse impossible", e);
+          setDriveStatus("☁ Cliquez sur « Connecter Google Drive » pour reprendre la synchro.");
+        }
+      } else if (waited > 6000) {
+        clearInterval(waitForGis);
+      }
+    }, 200);
+  }
+
+  document.getElementById("btnDriveConnect").addEventListener("click", function () {
+    if (driveAccessToken) {
+      if (confirm("Se déconnecter de Google Drive ? La synchronisation automatique s'arrêtera sur cet appareil.")) disconnectDrive();
+    } else {
+      connectDrive();
+    }
+  });
+
+  document.getElementById("btnDriveSyncNow").addEventListener("click", forceDriveSyncNow);
+
+  // ---------------------------------------------------------------------
+  // Calculs métier
+  // ---------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------
+  // Calculs métier (recopiés de la version 1 : computeRow inchangé)
+  // ---------------------------------------------------------------------
+  function findPlatform(id) {
+    var list = state.settings.platforms;
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return list[0];
+  }
+
+  // Embase obligatoire, mais uniquement sur les modèles de lampe (nom
+  // contenant "lampe") : colonne dédiée, entre Accessoires et Plateforme,
+  // E27 par défaut, LED, ou Aucune. Changer le type ajoute/retire directement
+  // le poids et le temps d'impression correspondants dans les champs
+  // "Poids (g)" / "Temps impr. (h)" (visibles, au-dessus de la colonne
+  // Embase) — computeRow ne fait ensuite plus aucun ajout caché.
+  var EMBASE_PRESETS = {
+    E27: { weight: 25, time: 1 },
+    LED: { weight: 15, time: 0.5 },
+    NONE: { weight: 0, time: 0 }
+  };
+
+  function embaseBaseName(name) {
+    return String(name || "").replace(/\s*\+\s*Embase\s+(E27|LED)\s*$/i, "");
+  }
+
+  function isLampProduct(p) {
+    return /lampe/i.test(embaseBaseName(p.name));
+  }
+
+  function getEmbaseType(p) {
+    return (p.embaseType === "LED" || p.embaseType === "NONE") ? p.embaseType : "E27";
+  }
+
+  function embaseTitle(name, embaseType) {
+    var base = embaseBaseName(name);
+    return embaseType === "NONE" ? base : base + " + Embase " + embaseType;
+  }
+
+  // Bascule un produit d'un type d'embase à un autre : retire le poids/temps
+  // de l'ancien type (ou rien si c'était encore vierge) et ajoute celui du
+  // nouveau, directement dans les champs Poids (g) / Temps impr. (h).
+  function applyEmbaseType(p, newType) {
+    var oldPreset = p.embaseType ? EMBASE_PRESETS[getEmbaseType(p)] : EMBASE_PRESETS.NONE;
+    var newPreset = EMBASE_PRESETS[newType] || EMBASE_PRESETS.NONE;
+    p.weight = String(parseNum(p.weight) - oldPreset.weight + newPreset.weight);
+    p.printTime = String(parseNum(p.printTime) - oldPreset.time + newPreset.time);
+    p.embaseType = newType;
+    p.name = embaseTitle(p.name, newType);
+  }
+
+  function findSitePlatform() {
+    return state.settings.platforms.filter(function (pl) {
+      return /^site/i.test(String(pl.name || "").trim());
+    })[0] || null;
+  }
+
+  function computeRow(p) {
+    var s = state.settings;
+    var price = parseNum(p.price);
+    var weight = parseNum(p.weight);
+    var filamentPrice = parseNum(p.filamentPrice);
+    var printTime = parseNum(p.printTime);
+    var laborTime = parseNum(p.laborTime);
+    var packaging = parseNum(p.packaging);
+    var accessories = parseNum(p.accessories);
+
+    var extrasWeight = 0, extrasTime = 0, extrasCost = 0;
+    (p.extras || []).forEach(function (ex) {
+      extrasWeight += parseNum(ex.weight);
+      extrasTime += parseNum(ex.time);
+      extrasCost += parseNum(ex.cost);
+    });
+    var totalWeight = weight + extrasWeight;
+    var totalPrintTime = printTime + extrasTime;
+
+    var failureMult = 1 + parseNum(s.failureRate) / 100;
+
+    // Les options (ex: embase LED/E27) sont perdues en cas d'échec d'impression
+    // au même titre que le filament et le temps d'impression.
+    extrasCost = extrasCost * failureMult;
+
+    var materialCost = (totalWeight / 1000 * filamentPrice) * failureMult;
+
+    var printerLifetime = parseNum(s.printerLifetime);
+    var amortization = printerLifetime > 0 ? parseNum(s.printerPrice) / printerLifetime : 0;
+    var energyCost = totalPrintTime * ((parseNum(s.printerPower) / 1000) * parseNum(s.kwhPrice) + amortization) * failureMult;
+
+    var isPerso = state.saleMode === "perso";
+
+    var platform = findPlatform(p.platformId) || { percent: 0, fixed: 0 };
+    var platformPercent = isPerso ? 0 : parseNum(platform.percent);
+    var platformFixed = isPerso ? 0 : parseNum(platform.fixed);
+    var platformCost = price * platformPercent / 100 + platformFixed;
+
+    var socialRate = isPerso ? 0 : parseNum(s.socialChargeRate);
+    var socialCost = price * socialRate / 100;
+
+    var laborCost = (laborTime / 60) * parseNum(s.laborRate);
+
+    var totalCost = materialCost + energyCost + platformCost + socialCost + laborCost + packaging + accessories + extrasCost;
+
+    function pctOfTotal(v) { return totalCost > 0 ? (v / totalCost * 100) : null; }
+    var materialCostPercent = pctOfTotal(materialCost);
+    var energyCostPercent = pctOfTotal(energyCost);
+    var platformCostPercent = pctOfTotal(platformCost);
+    var socialCostPercent = pctOfTotal(socialCost);
+    var laborCostPercent = pctOfTotal(laborCost);
+    var packagingPercent = pctOfTotal(packaging);
+    var accessoriesPercent = pctOfTotal(accessories);
+
+    var netMargin = price - totalCost;
+    var netMarginPercent = price > 0 ? (netMargin / price * 100) : null;
+
+    // Marge si le même produit était vendu sur le site (profil « Site internet »,
+    // frais Stripe), au même prix, quelle que soit la plateforme de la ligne (Benjamin, 11/11/2026).
+    var site = findSitePlatform();
+    var siteMargin = null, siteMarginPercent = null;
+    if (site) {
+      var siteFees = isPerso ? 0 : price * parseNum(site.percent) / 100 + parseNum(site.fixed);
+      siteMargin = price - (totalCost - platformCost + siteFees);
+      siteMarginPercent = price > 0 ? (siteMargin / price * 100) : null;
+    }
+    var marginPerHour = totalPrintTime > 0 ? (netMargin / totalPrintTime) : null;
+
+    var fixedCosts = materialCost + energyCost + laborCost + packaging + accessories + extrasCost;
+    var targetMargin = parseNum(s.targetMargin);
+    var denom = 1 - platformPercent / 100 - socialRate / 100 - targetMargin / 100;
+    var minPrice = denom > 0 ? (fixedCosts + platformFixed) / denom : null;
+    // Prix sous le minimum cible : alerte + prix conseillé « en ,90 » juste au-dessus
+    // (même arrondi que prix_conseille.py, Benjamin 10/11/2026).
+    var belowMin = minPrice !== null && price < minPrice - 0.005;
+    var suggestedPrice = null;
+    if (minPrice !== null) {
+      suggestedPrice = Math.floor(minPrice) + 0.9;
+      if (suggestedPrice < minPrice - 1e-9) suggestedPrice += 1;
+    }
+
+    return {
+      materialCost: materialCost, energyCost: energyCost, platformCost: platformCost,
+      socialCost: socialCost, laborCost: laborCost, totalCost: totalCost,
+      // Part des coûts proportionnelle au prix (commission % + cotisations) : baisse avec une réduction.
+      priceLinkedCost: price * platformPercent / 100 + socialCost,
+      materialCostPercent: materialCostPercent, energyCostPercent: energyCostPercent,
+      platformCostPercent: platformCostPercent, socialCostPercent: socialCostPercent,
+      laborCostPercent: laborCostPercent,
+      packagingPercent: packagingPercent, accessoriesPercent: accessoriesPercent,
+      netMargin: netMargin, netMarginPercent: netMarginPercent, minPrice: minPrice,
+      belowMin: belowMin, suggestedPrice: suggestedPrice,
+      siteMargin: siteMargin, siteMarginPercent: siteMarginPercent,
+      amortization: amortization, totalPrintTime: totalPrintTime, marginPerHour: marginPerHour
+    };
+  }
+
+  function marginClass(percent) {
+    if (percent === null || percent === undefined || isNaN(percent)) return "neutral";
+    var target = parseNum(state.settings.targetMargin);
+    if (percent < 0) return "red";
+    if (percent < target) return "orange";
+    return "green";
+  }
+
+  // ---------------------------------------------------------------------
+  // Définition des colonnes
+  // ---------------------------------------------------------------------
+
+  // =====================================================================
+  // Interface v2 (onglets)
+  // =====================================================================
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function pct0(n) {
+    if (n === null || n === undefined || isNaN(n) || !isFinite(n)) return "—";
+    return n.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " %";
+  }
+  function hm(h) { var m = Math.round(h * 60); return Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0"); }
+  function pill(text, cls) { return '<span class="pill ' + cls + '">' + text + "</span>"; }
+  function prodById(id) { return state.products.filter(function (x) { return x.id === id; })[0]; }
+  // Même formule (computeRow) pour une autre plateforme ou un autre prix : on calcule sur une copie.
+  function computeWith(p, overrides) { return computeRow(Object.assign({}, p, overrides)); }
+  function platformLabel(p) { var pl = findPlatform(p.platformId); return pl ? pl.name : ""; }
+  function socialCostLabel() {
+    var rate = String(state.settings.socialChargeRate || "").trim().replace(".", ",");
+    return "URSSAF" + (rate ? " " + rate + " %" : "");
+  }
+  // Catégorie déduite du nom (rien n'est ajouté aux données).
+  function categorie(p) {
+    var nom = embaseBaseName(p.name);
+    if (/lampe/i.test(nom)) return "Lampes";
+    if (/^vase/i.test(nom)) return "Vases";
+    if (/suspension|embase|socle/i.test(nom)) return "Accessoires";
+    if (/no[eë]l|citrouille|halloween|gland|boule|nain|sapin|neige/i.test(nom)) return "Saisonnier";
+    return "Autres";
+  }
+
+  var ui = { tab: "bord", sortKey: "", sortDir: 1, cat: "Tous" };
+  try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch (e) {}
+  function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) {} }
+
+  var selectedIds = new Set();
+  var ficheId = null;
+
+  var toastTimer = null;
+  function toast(text) {
+    var el = document.getElementById("toast");
+    el.textContent = text; el.classList.add("on");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("on"); }, 2600);
+  }
+
+  // ---------------------------------------------------------------------
+  // Onglets
+  // ---------------------------------------------------------------------
+  function showTab(tab) {
+    ui.tab = tab; saveUi();
+    document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-tab") === tab); });
+    document.querySelectorAll(".tab").forEach(function (t) { t.classList.toggle("on", t.id === "t-" + tab); });
+  }
+  document.getElementById("tabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-tab]"); if (!b) return;
+    showTab(b.getAttribute("data-tab"));
+    window.scrollTo(0, 0);
+  });
+
+  // ---------------------------------------------------------------------
+  // Tableau de bord
+  // ---------------------------------------------------------------------
+  function kpi(v, l, alerte) { return '<div class="kpi' + (alerte ? " alerte" : "") + '"><div class="v">' + v + '</div><div class="l">' + l + "</div></div>"; }
+
+  function renderBord() {
+    var rows = state.products.map(function (p) { return { p: p, c: computeRow(p) }; });
+    var site = findSitePlatform();
+    var tot = { price: 0, margin: 0, site: 0 };
+    rows.forEach(function (x) { tot.price += parseNum(x.p.price); tot.margin += x.c.netMargin; if (x.c.siteMargin !== null) tot.site += x.c.siteMargin; });
+    var avg = tot.price > 0 ? tot.margin / tot.price * 100 : null;
+    var avgSite = site && tot.price > 0 ? tot.site / tot.price * 100 : null;
+    var sous = rows.filter(function (x) { return x.c.belowMin && x.c.suggestedPrice !== null; });
+    document.getElementById("kpis").innerHTML =
+      kpi(rows.length, "Produits au catalogue") +
+      kpi(pill(pct0(avg), marginClass(avg)), "Marge moyenne (plateforme de chaque produit)") +
+      kpi(site ? pill(pct0(avgSite), marginClass(avgSite)) : "—", site ? "Marge moyenne si vendu sur le site" : "Pas de plateforme « Site »") +
+      kpi(sous.length, "Sous le prix minimum", sous.length > 0);
+
+    document.getElementById("aCorriger").innerHTML = sous.length ? sous.map(function (x) {
+      return '<div class="ligne-simple"><div><button class="lien" data-open="' + x.p.id + '">' + escapeHtml(x.p.name) + '</button><div class="soft">' +
+        formatCurrency(parseNum(x.p.price)) + " pour " + formatCurrency(x.c.minPrice) + " minimum (" + escapeHtml(platformLabel(x.p)) + ")</div></div>" +
+        '<button class="btn alerte" data-action="applyMin" data-id="' + x.p.id + '">Passer à ' + formatCurrency(x.c.suggestedPrice) + "</button></div>";
+    }).join("") : '<p class="soft" style="margin:0">Rien à corriger 👍</p>';
+
+    var parH = rows.filter(function (x) { return x.c.marginPerHour !== null; })
+      .sort(function (a, b) { return b.c.marginPerHour - a.c.marginPerHour; });
+    var topHtml = parH.slice(0, 5).map(function (x) {
+      return '<div class="ligne-simple"><button class="lien" data-open="' + x.p.id + '">' + escapeHtml(x.p.name) + "</button>" + pill(formatCurrency(x.c.marginPerHour) + "/h", marginClass(x.c.netMarginPercent)) + "</div>";
+    }).join("");
+    if (parH.length > 5) {
+      topHtml += '<div class="ligne-simple soft"><span>Moins rentables : ' + parH.slice(-2).reverse().map(function (x) {
+        return escapeHtml(x.p.name) + " (" + formatCurrency(x.c.marginPerHour) + "/h)";
+      }).join(", ") + "</span></div>";
+    }
+    document.getElementById("top").innerHTML = topHtml || '<p class="soft" style="margin:0">Aucun produit avec un temps d\'impression.</p>';
+
+    var gainEl = document.getElementById("gainSite");
+    if (!site) {
+      gainEl.innerHTML = '<p class="soft" style="margin:0">Ajoute une plateforme dont le nom commence par « Site » dans l\'onglet Réglages.</p>';
+    } else {
+      var gains = rows.filter(function (x) { return x.p.platformId !== site.id && x.c.siteMargin !== null; })
+        .map(function (x) { return { p: x.p, g: x.c.siteMargin - x.c.netMargin }; })
+        .sort(function (a, b) { return b.g - a.g; });
+      gainEl.innerHTML = '<p class="soft" style="margin:0 0 6px">Sur une vente de chaque produit : <b>' + formatCurrency(tot.site) + "</b> de marge sur le site contre <b>" +
+        formatCurrency(tot.margin) + "</b> avec la plateforme actuelle de chaque produit." +
+        (state.saleMode === "perso" ? " (Mode vente directe : aucun frais, donc aucun écart.)" : "") + "</p>" +
+        gains.slice(0, 4).map(function (x) {
+          return '<div class="ligne-simple"><button class="lien" data-open="' + x.p.id + '">' + escapeHtml(x.p.name) + "</button>" + pill((x.g >= 0 ? "+" : "") + formatCurrency(x.g), x.g >= 0 ? "green" : "red") + "</div>";
+        }).join("");
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Produits : puces, liste, totaux
+  // ---------------------------------------------------------------------
+  function renderChips() {
+    var cats = ["Tous"];
+    state.products.forEach(function (p) { var c = categorie(p); if (cats.indexOf(c) < 0) cats.push(c); });
+    if (cats.indexOf(ui.cat) < 0) ui.cat = "Tous";
+    document.getElementById("chips").innerHTML = cats.map(function (c) {
+      var nb = c === "Tous" ? state.products.length : state.products.filter(function (p) { return categorie(p) === c; }).length;
+      return '<button class="chip' + (c === ui.cat ? " on" : "") + '" data-cat="' + escapeHtml(c) + '">' + escapeHtml(c) + " · " + nb + "</button>";
+    }).join("");
+  }
+
+  function sortedRows() {
+    var q = document.getElementById("recherche").value.trim().toLowerCase();
+    var rows = state.products
+      .filter(function (p) { return (ui.cat === "Tous" || categorie(p) === ui.cat) && String(p.name || "").toLowerCase().indexOf(q) >= 0; })
+      .map(function (p) { return { p: p, c: computeRow(p) }; });
+    var key = ui.sortKey, dir = ui.sortDir;
+    if (!key) return rows;
+    rows.sort(function (a, b) {
+      if (key === "name") {
+        var sa = String(a.p.name || "").toLowerCase(), sb = String(b.p.name || "").toLowerCase();
+        return sa < sb ? -dir : sa > sb ? dir : 0;
+      }
+      var va = (key === "price" || key === "weight" || key === "printTime") ? parseNum(a.p[key]) : a.c[key];
+      var vb = (key === "price" || key === "weight" || key === "printTime") ? parseNum(b.p[key]) : b.c[key];
+      va = (va === null || va === undefined || isNaN(va)) ? -Infinity : va;
+      vb = (vb === null || vb === undefined || isNaN(vb)) ? -Infinity : vb;
+      return va === vb ? 0 : (va < vb ? -dir : dir);
+    });
+    return rows;
+  }
+
+  function renderList() {
+    document.getElementById("tri").value = ui.sortKey;
+    var sens = document.getElementById("triSens");
+    sens.textContent = ui.sortDir === 1 ? "↑" : "↓";
+    sens.disabled = !ui.sortKey;
+    var hasSite = !!findSitePlatform();
+    var rows = sortedRows();
+    document.getElementById("lignes").innerHTML = rows.map(function (x) {
+      var p = x.p, c = x.c, sel = selectedIds.has(p.id);
+      return '<div class="prod' + (sel ? " sel" : "") + '" data-id="' + p.id + '">' +
+        '<div class="c-nom"><input type="checkbox" class="row-select" data-id="' + p.id + '" aria-label="Sélectionner ce produit"' + (sel ? " checked" : "") + '>' +
+          '<div><div class="nom">' + (c.belowMin ? "⚠ " : "") + escapeHtml(p.name || "Sans nom") + '</div><div class="cat">' + escapeHtml(categorie(p)) + " · " +
+          formatNumberPlain(parseNum(p.weight), 0) + " g · " + hm(c.totalPrintTime) + " · " + escapeHtml(platformLabel(p)) + "</div></div></div>" +
+        '<div class="r num c-prix">' + formatCurrency(parseNum(p.price)) + "</div>" +
+        '<div class="r c-marge">' + pill(formatCurrency(c.netMargin), marginClass(c.netMarginPercent)) + "</div>" +
+        '<div class="r c-site">' + (hasSite ? pill(formatCurrency(c.siteMargin), marginClass(c.siteMarginPercent)) : '<span class="soft">—</span>') + "</div>" +
+        '<div class="r num c-min' + (c.belowMin ? " min-bas" : "") + '">' + formatCurrency(c.minPrice) + "</div></div>";
+    }).join("") || '<p class="soft vide">' + (state.products.length ? "Aucun produit trouvé." : "Aucun produit. Clique sur « + Produit ».") + "</p>";
+  }
+
+  function renderTotals() {
+    var isSelection = selectedIds.size > 0;
+    var list = isSelection ? state.products.filter(function (p) { return selectedIds.has(p.id); }) : state.products;
+    var n = list.length;
+    var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, priceLinkedCost: 0, netMargin: 0, packaging: 0, accessories: 0, totalPrintTime: 0, siteMargin: 0 };
+    var hasSite = !!findSitePlatform();
+    list.forEach(function (p) {
+      var c = computeRow(p);
+      sums.price += parseNum(p.price);
+      sums.materialCost += c.materialCost;
+      sums.energyCost += c.energyCost;
+      sums.platformCost += c.platformCost;
+      sums.socialCost += c.socialCost;
+      sums.laborCost += c.laborCost;
+      sums.totalCost += c.totalCost;
+      sums.priceLinkedCost += c.priceLinkedCost;
+      sums.netMargin += c.netMargin;
+      sums.packaging += parseNum(p.packaging);
+      sums.accessories += parseNum(p.accessories);
+      sums.totalPrintTime += c.totalPrintTime;
+      if (c.siteMargin !== null) sums.siteMargin += c.siteMargin;
+    });
+    // Comme la v1 : % global = somme des marges ÷ somme des prix ; €/h = somme des marges ÷ somme des heures.
+    var avgMarginPercent = sums.price > 0 ? (sums.netMargin / sums.price * 100) : null;
+    var avgMarginPerHour = sums.totalPrintTime > 0 ? (sums.netMargin / sums.totalPrintTime) : null;
+    var siteMarginPercentTotal = hasSite && sums.price > 0 ? (sums.siteMargin / sums.price * 100) : null;
+    var options = sums.totalCost - sums.materialCost - sums.energyCost - sums.platformCost - sums.socialCost - sums.laborCost - sums.packaging - sums.accessories;
+    function sumPct(v) { return sums.totalCost > 0 ? (v / sums.totalCost * 100) : null; }
+    function stat(l, v) { return '<div class="stat"><div class="l">' + l + '</div><div class="v">' + v + "</div></div>"; }
+    function detail(l, v) { return '<div class="ligne-simple"><span>' + l + '</span><span class="num">' + formatCurrency(v) + ' <span class="soft">' + formatPercent(sumPct(v)) + "</span></span></div>"; }
+    document.getElementById("totauxDyn").innerHTML =
+      '<div class="outils" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">' + (isSelection ? "Sélection" : "Total") + ' <span class="soft">(' + n + " produit" + (n > 1 ? "s" : "") + ", une vente de chacun)</span></h3>" +
+      (isSelection ? '<button class="btn" id="totalsClearSelection">✕ Effacer la sélection</button>' : "") + "</div>" +
+      '<div class="stats">' +
+        stat("Prix de vente", formatCurrency(sums.price)) +
+        stat("Coût total", formatCurrency(sums.totalCost)) +
+        stat("Marge nette", formatCurrency(sums.netMargin)) +
+        stat("Marge (moy.)", pill(formatPercent(avgMarginPercent), marginClass(avgMarginPercent))) +
+        stat("€ par heure machine", pill(formatCurrency(avgMarginPerHour), marginClass(avgMarginPercent))) +
+        stat("Marge si vendu sur le site", hasSite ? pill(formatCurrency(sums.siteMargin), marginClass(siteMarginPercentTotal)) : "—") +
+      "</div>" +
+      '<details class="repli"><summary>Détail des coûts (part du coût total)</summary>' +
+        detail("Matière", sums.materialCost) + detail("Machine (électricité + usure)", sums.energyCost) +
+        detail("Frais de plateforme", sums.platformCost) + detail(escapeHtml(socialCostLabel()), sums.socialCost) +
+        detail("Main d'œuvre", sums.laborCost) + detail("Emballage", sums.packaging) + detail("Accessoires", sums.accessories) +
+        (Math.abs(options) > 0.004 ? detail("Options", options) : "") +
+      "</details>";
+    updateDiscountRow(sums.price, sums.totalCost, sums.netMargin, sums.priceLinkedCost);
+  }
+
+  // Simulation d'une réduction (%) sur le Total / la Sélection (recopiée de la v1 :
+  // la commission % et les cotisations URSSAF baissent avec le prix).
+  function updateDiscountRow(price, totalCost, netMargin, priceLinkedCost) {
+    var input = document.getElementById("discountPercent");
+    var pct = input ? parseNum(input.value) : 0;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+
+    var discountedPrice = price * (1 - pct / 100);
+    var discountedMargin = discountedPrice - (totalCost - (priceLinkedCost || 0) * pct / 100);
+    var discountedMarginPercent = discountedPrice > 0 ? (discountedMargin / discountedPrice * 100) : null;
+    var impact = discountedMargin - netMargin;
+
+    document.getElementById("discountPrice").textContent = formatCurrency(discountedPrice);
+    document.getElementById("discountMargin").textContent = formatCurrency(discountedMargin);
+    document.getElementById("discountMarginPercent").innerHTML = '<span class="pill ' + marginClass(discountedMarginPercent) + '">' + formatPercent(discountedMarginPercent) + "</span>";
+    var impactEl = document.getElementById("discountImpact");
+    impactEl.textContent = (impact > 0 ? "+" : "") + formatCurrency(impact);
+    impactEl.classList.toggle("impact-negative", impact < 0);
+  }
+
+  // Les lampes créées avant l'ajout de l'embase passent une fois sur E27 (comme la v1).
+  function normalizeEmbaseTypes() {
+    var changed = false;
+    state.products.forEach(function (p) {
+      if (isLampProduct(p) && !p.embaseType) {
+        applyEmbaseType(p, "E27");
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function renderBody() {
+    if (normalizeEmbaseTypes()) saveState();
+    renderBord();
+    renderChips();
+    renderList();
+    renderTotals();
+    if (ficheId) renderFicheDyn();
+  }
+
+  // Rendu complet (après import, synchro Drive, changement de réglage).
+  function renderAll(full) {
+    renderBody();
+    renderSales();
+    if (full) {
+      renderSettingsInputs();
+      if (ficheId) { if (prodById(ficheId)) renderFiche(); else closeFiche(); }
+    }
+  }
+
+  // Pendant la saisie dans la fiche, on rafraîchit le reste de la page un peu après.
+  var bgTimer = null;
+  function scheduleBackgroundRender() {
+    if (bgTimer) clearTimeout(bgTimer);
+    bgTimer = setTimeout(function () { bgTimer = null; renderBord(); renderChips(); renderList(); renderTotals(); }, 250);
+  }
+
+  document.getElementById("chips").addEventListener("click", function (e) {
+    var c = e.target.closest(".chip"); if (!c) return;
+    ui.cat = c.getAttribute("data-cat"); saveUi(); renderChips(); renderList();
+  });
+  document.getElementById("recherche").addEventListener("input", renderList);
+  document.getElementById("tri").addEventListener("change", function () {
+    ui.sortKey = this.value;
+    ui.sortDir = (ui.sortKey === "" || ui.sortKey === "name") ? 1 : -1;
+    saveUi(); renderList();
+  });
+  document.getElementById("triSens").addEventListener("click", function () { ui.sortDir = -ui.sortDir; saveUi(); renderList(); });
+
+  document.getElementById("lignes").addEventListener("change", function (e) {
+    var t = e.target;
+    if (!t.matches("input.row-select")) return;
+    var id = t.getAttribute("data-id");
+    if (t.checked) selectedIds.add(id); else selectedIds.delete(id);
+    var row = t.closest(".prod"); if (row) row.classList.toggle("sel", t.checked);
+    renderTotals();
+  });
+  document.getElementById("lignes").addEventListener("click", function (e) {
+    if (e.target.closest("input.row-select")) return;
+    var r = e.target.closest(".prod"); if (r) openFiche(r.getAttribute("data-id"));
+  });
+  document.getElementById("totaux").addEventListener("click", function (e) {
+    if (!e.target.closest("#totalsClearSelection")) return;
+    selectedIds.clear(); renderList(); renderTotals();
+  });
+  document.getElementById("discountPercent").addEventListener("input", function () { renderTotals(); });
+
+  document.getElementById("btnAddRow").addEventListener("click", function () {
+    state.products.push({
+      id: uid("prod"), name: "Nouveau produit", price: "0", weight: "0", filamentPrice: WORKSHOP_FILAMENT_PRICE,
+      printTime: "0", laborTime: "0", packaging: WORKSHOP_PACKAGING, accessories: "0",
+      platformId: state.settings.platforms[0].id, extras: []
+    });
+    saveState();
+    renderBody();
+    openFiche(state.products[state.products.length - 1].id);
+  });
+
+  // ---------------------------------------------------------------------
+  // Fiche produit (panneau latéral)
+  // ---------------------------------------------------------------------
+  function openFiche(id) {
+    if (!prodById(id)) return;
+    ficheId = id;
+    document.getElementById("voile").classList.add("on");
+    document.getElementById("fiche").classList.add("on");
+    document.body.classList.add("fiche-ouverte");
+    renderFiche();
+    document.getElementById("fiche").scrollTop = 0;
+  }
+  function closeFiche() {
+    ficheId = null;
+    document.getElementById("voile").classList.remove("on");
+    document.getElementById("fiche").classList.remove("on");
+    document.body.classList.remove("fiche-ouverte");
+  }
+  document.getElementById("voile").addEventListener("click", closeFiche);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && ficheId) closeFiche(); });
+
+  function champ(p, key, label, extra) {
+    var ro = key === "filamentPrice" ? ' readonly title="Base atelier fixe : filament 15 €/kg"' : "";
+    return '<div><label for="f_' + key + '">' + label + (extra || "") + '</label><input type="text" inputmode="decimal" id="f_' + key + '" data-id="' + p.id +
+      '" data-field="' + key + '" value="' + escapeHtml(p[key] || "") + '"' + ro + "></div>";
+  }
+  function platformOptionsHtml(selectedId) {
+    return state.settings.platforms.map(function (pl) {
+      return '<option value="' + pl.id + '"' + (pl.id === selectedId ? " selected" : "") + ">" + escapeHtml(pl.name) + "</option>";
+    }).join("");
+  }
+  function embaseOptionsHtml(selectedType) {
+    return '<option value="E27"' + (selectedType === "E27" ? " selected" : "") + ">Embase E27</option>" +
+      '<option value="LED"' + (selectedType === "LED" ? " selected" : "") + ">Embase LED</option>" +
+      '<option value="NONE"' + (selectedType === "NONE" ? " selected" : "") + ">Aucune</option>";
+  }
+  function extrasHtml(p) {
+    var rows = (p.extras || []).map(function (ex) {
+      function f(field, label, cls) {
+        return '<div class="' + (cls || "") + '"><label>' + label + '</label><input type="text"' + (field === "name" ? ' placeholder="Ex : Suspension"' : ' inputmode="decimal"') +
+          ' data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="' + field + '" value="' + escapeHtml(ex[field] || "") + '"></div>';
+      }
+      return '<div class="extra">' + f("name", "Nom", "e-nom") + f("weight", "Poids (g)") + f("time", "Temps (h)") + f("cost", "Coût pièce (€)") +
+        '<div><button class="btn danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette option">✕</button></div></div>';
+    }).join("");
+    return rows + '<button class="btn" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une option</button>';
+  }
+
+  function renderFiche() {
+    var p = prodById(ficheId);
+    if (!p) { closeFiche(); return; }
+    var lamp = isLampProduct(p);
+    document.getElementById("fiche").innerHTML =
+      '<div class="fiche-tete"><div><div class="soft">' + escapeHtml(categorie(p)) + '</div><input class="titre" aria-label="Nom du produit" data-id="' + p.id + '" data-field="name" value="' + escapeHtml(p.name || "") + '"></div>' +
+        '<button class="btn" data-action="close">✕ Fermer</button></div>' +
+      '<div id="ficheAlert"></div>' +
+      '<div class="card"><h3>Données du produit</h3><div class="champs">' +
+        champ(p, "price", "Prix de vente TTC (€)") + champ(p, "weight", "Poids (g)") + champ(p, "printTime", "Temps impr. (h)") +
+        champ(p, "laborTime", "Main d'œuvre (min)") + champ(p, "packaging", "Emballage (€)", ' <span class="pct" id="pct_packaging"></span>') +
+        champ(p, "accessories", "Accessoires (€)", ' <span class="pct" id="pct_accessories"></span>') +
+        champ(p, "filamentPrice", "Filament (€/kg)") +
+        '<div><label for="f_platformId">Plateforme</label><select id="f_platformId" data-id="' + p.id + '" data-field="platformId">' + platformOptionsHtml(p.platformId) + "</select></div>" +
+        (lamp ? '<div><label for="f_embaseType">Embase</label><select id="f_embaseType" data-id="' + p.id + '" data-field="embaseType">' + embaseOptionsHtml(getEmbaseType(p)) + "</select></div>" : "") +
+      "</div>" + (lamp ? '<p class="soft" style="margin:8px 0 0">Changer l\'embase ajoute ou retire son poids et son temps dans les champs ci-dessus.</p>' : "") + "</div>" +
+      '<div class="card"><h3>Options / lignes supplémentaires</h3>' + extrasHtml(p) + "</div>" +
+      '<div id="ficheDyn"></div>' +
+      '<div class="card"><h3>Actions</h3><div class="vendu">' +
+        '<button class="btn prim" data-action="sold" data-id="' + p.id + '">✓ Vendu</button><span class="soft">sur</span>' +
+        '<select id="soldPlatform" aria-label="Plateforme de la vente">' + platformOptionsHtml(p.platformId) + "</select>" +
+        '<button class="btn" data-action="dup" data-id="' + p.id + '">⧉ Dupliquer</button>' +
+        '<button class="btn danger" data-action="del" data-id="' + p.id + '">Supprimer</button></div></div>';
+    renderFicheDyn();
+  }
+
+  // « Où part l'argent » (Benjamin, 11/11/2026) : barres horizontales rangées de la dépense
+  // la plus chère à la moins chère, total, puis la marge à part en vert (camembert refusé).
+  function depensesHtml(p, c) {
+    var price = parseNum(p.price);
+    var options = c.totalCost - c.materialCost - c.energyCost - c.platformCost - c.socialCost - c.laborCost - parseNum(p.packaging) - parseNum(p.accessories);
+    var parts = [
+      ["Matière", c.materialCost], ["Machine", c.energyCost], ["Frais " + platformLabel(p), c.platformCost],
+      [socialCostLabel(), c.socialCost], ["Main d'œuvre", c.laborCost], ["Emballage", parseNum(p.packaging)],
+      ["Accessoires", parseNum(p.accessories)], ["Options", options]
+    ].filter(function (x) { return x[1] > 0.004; }).sort(function (a, b) { return b[1] - a[1]; });
+    var max = Math.max.apply(null, parts.map(function (x) { return x[1]; }).concat([Math.max(c.netMargin, 0), 0.01]));
+    function partPrix(v) { return price > 0 ? Math.round(v / price * 100) + " %" : "—"; }
+    function ligne(nom, v, cls) {
+      return "<span>" + nom + '</span><div class="piste"><i class="' + cls + '" style="width:' + Math.max(0, Math.min(100, v / max * 100)) + '%"></i></div><b>' + formatCurrency(v) + "</b><em>" + partPrix(v) + "</em>";
+    }
+    return '<div class="depenses">' + parts.map(function (x, i) { return ligne(escapeHtml(x[0]), x[1], i === 0 ? "top" : ""); }).join("") +
+      '<div class="sep"></div><span class="soft">Total dépenses</span><span></span><b>' + formatCurrency(c.totalCost) + "</b><em>" + partPrix(c.totalCost) + "</em>" +
+      ligne(c.netMargin < 0 ? '<b style="color:var(--red)">Ta marge</b>' : "<b>Ta marge</b>", c.netMargin, "marge") + "</div>";
+  }
+
+  function renderFicheDyn() {
+    var p = prodById(ficheId);
+    if (!p || !document.getElementById("ficheDyn")) return;
+    var c = computeRow(p);
+    document.getElementById("ficheAlert").innerHTML = c.belowMin && c.suggestedPrice !== null
+      ? '<div class="card" style="border-color:var(--red)"><b style="color:var(--red)">⚠ Sous le prix minimum ' + escapeHtml(platformLabel(p)) + " (" + formatCurrency(c.minPrice) + ")</b> " +
+        '<button class="btn alerte" style="margin-left:6px" data-action="applyMin" data-id="' + p.id + '">Passer à ' + formatCurrency(c.suggestedPrice) + "</button></div>"
+      : "";
+    var pk = document.getElementById("pct_packaging"), ac = document.getElementById("pct_accessories");
+    if (pk) pk.textContent = "· " + formatPercent(c.packagingPercent) + " du coût";
+    if (ac) ac.textContent = "· " + formatPercent(c.accessoriesPercent) + " du coût";
+
+    var plats = state.settings.platforms.map(function (pl) { return { pl: pl, c: computeWith(p, { platformId: pl.id }) }; });
+    var best = plats.reduce(function (a, b) { return b.c.netMargin > a.c.netMargin + 1e-9 ? b : a; }, plats[0]);
+    var price = parseNum(p.price);
+    var lo = price > 0 ? Math.max(1, Math.floor(price * 0.6)) : 0, hi = price > 0 ? Math.ceil(price * 1.5) : 100;
+    document.getElementById("ficheDyn").innerHTML =
+      '<div class="card"><h3>Combien il te rapporte</h3><div class="compare">' + plats.map(function (x) {
+        var cur = x.pl.id === p.platformId;
+        return '<div class="plat' + (x === best ? " best" : "") + '"><h4>' + escapeHtml(x.pl.name) + (x === best ? " 🏆" : "") + (cur ? ' <span class="soft">(actuelle)</span>' : "") + "</h4>" +
+          '<div class="m">' + pill(formatCurrency(x.c.netMargin), marginClass(x.c.netMarginPercent)) + "</div>" +
+          '<div class="d">' + pct0(x.c.netMarginPercent) + " · frais " + formatCurrency(x.c.platformCost) + "<br>prix min. " + formatCurrency(x.c.minPrice) +
+          "<br>" + formatCurrency(x.c.marginPerHour) + "/h machine</div></div>";
+      }).join("") + "</div>" + (state.saleMode === "perso" ? '<p class="note">Mode vente directe : frais de plateforme et URSSAF ignorés partout.</p>' : "") + "</div>" +
+      '<div class="card"><h3>Où part l\'argent (vente ' + escapeHtml(platformLabel(p)) + " à " + formatCurrency(price) + ")</h3>" + depensesHtml(p, c) +
+        '<p class="soft" style="margin:10px 0 0">Prix min. pour ' + formatNumberPlain(parseNum(state.settings.targetMargin), 0) + " % de marge : <b>" + formatCurrency(c.minPrice) + "</b>" +
+        (c.suggestedPrice !== null ? " · prix conseillé : <b>" + formatCurrency(c.suggestedPrice) + "</b>" : "") + "</p></div>" +
+      '<div class="card simu"><h3>Et si je change le prix ?</h3><input type="range" id="simu" aria-label="Prix simulé" min="' + lo + '" max="' + hi + '" step="0.1" value="' + Math.min(hi, Math.max(lo, price)) + '">' +
+        '<div class="vendu"><div id="simuRes" class="soft" style="flex:1 1 220px"></div><button class="btn" data-action="useSimu" data-id="' + p.id + '">Utiliser ce prix</button></div></div>';
+    updateSimu();
+  }
+
+  function updateSimu() {
+    var p = prodById(ficheId), r = document.getElementById("simu");
+    if (!p || !r) return;
+    var P = parseFloat(r.value);
+    var parts = state.settings.platforms.map(function (pl) {
+      var c = computeWith(p, { price: String(P), platformId: pl.id });
+      return escapeHtml(pl.name) + " " + pill(formatCurrency(c.netMargin), marginClass(c.netMarginPercent));
+    });
+    document.getElementById("simuRes").innerHTML = "À <b>" + formatCurrency(P) + "</b> : " + parts.join(" · ");
+  }
+
+  var fiche = document.getElementById("fiche");
+  fiche.addEventListener("input", function (e) {
+    var t = e.target;
+    if (t.id === "simu") { updateSimu(); return; }
+    var p = prodById(ficheId); if (!p) return;
+    if (t.matches("input[data-field]")) {
+      if (t.readOnly) return;
+      p[t.getAttribute("data-field")] = t.value;
+    } else if (t.matches("[data-extra-field]")) {
+      var ex = (p.extras || []).filter(function (x) { return x.id === t.getAttribute("data-extra-id"); })[0];
+      if (!ex) return;
+      ex[t.getAttribute("data-extra-field")] = t.value;
+    } else return;
+    saveState();
+    renderFicheDyn();
+    scheduleBackgroundRender();
+  });
+  fiche.addEventListener("change", function (e) {
+    var t = e.target, p = prodById(ficheId); if (!p) return;
+    if (t.matches('select[data-field="platformId"]')) {
+      p.platformId = t.value;
+      saveState(); renderFicheDyn(); scheduleBackgroundRender();
+      var sp = document.getElementById("soldPlatform"); if (sp) sp.value = p.platformId;
+    } else if (t.matches('select[data-field="embaseType"]')) {
+      applyEmbaseType(p, t.value);
+      saveState(); renderFiche(); scheduleBackgroundRender();
+    }
+  });
+
+  // Actions (fiche et tableau de bord)
+  document.addEventListener("click", function (e) {
+    var opener = e.target.closest("[data-open]");
+    if (opener) { openFiche(opener.getAttribute("data-open")); return; }
+    var btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-id");
+    var action = btn.getAttribute("data-action");
+    if (action === "close") {
+      closeFiche();
+    } else if (action === "applyMin") {
+      var minProd = prodById(id);
+      if (!minProd) return;
+      var mc = computeRow(minProd);
+      if (!mc.belowMin || mc.suggestedPrice === null) return;
+      if (!confirm("Passer « " + minProd.name + " » de " + formatCurrency(parseNum(minProd.price)) + " à " +
+          formatCurrency(mc.suggestedPrice) + " ?\n(prix minimum pour ta marge cible : " + formatCurrency(mc.minPrice) + ")")) return;
+      minProd.price = mc.suggestedPrice.toFixed(2).replace(".", ",");
+      saveState();
+      renderBody();
+      if (ficheId === id) renderFiche();
+      toast("Prix mis à jour : " + formatCurrency(mc.suggestedPrice));
+    } else if (action === "useSimu") {
+      var simProd = prodById(id), r = document.getElementById("simu");
+      if (!simProd || !r) return;
+      simProd.price = parseFloat(r.value).toFixed(2).replace(".", ",");
+      saveState(); renderFiche(); scheduleBackgroundRender();
+      toast("Prix mis à jour : " + formatCurrency(parseNum(simProd.price)));
+    } else if (action === "sold") {
+      var soldProd = prodById(id);
+      if (!soldProd) return;
+      var sp = document.getElementById("soldPlatform");
+      var soldPlatformId = sp && sp.value ? sp.value : soldProd.platformId;
+      var c = computeWith(soldProd, { platformId: soldPlatformId });
+      var platform = findPlatform(soldPlatformId);
+      state.sales.push({
+        id: uid("sale"),
+        productId: soldProd.id,
+        name: soldProd.name,
+        price: parseNum(soldProd.price),
+        cost: c.totalCost,
+        margin: c.netMargin,
+        platformId: soldPlatformId,
+        platformName: platform ? platform.name : "",
+        date: new Date().toISOString(),
+        source: "manual"
+      });
+      saveState();
+      renderSales();
+      toast("Vente enregistrée (" + (platform ? platform.name : "") + ", marge " + formatCurrency(c.netMargin) + ")");
+    } else if (action === "dup") {
+      var p = prodById(id);
+      if (!p) return;
+      var copiedExtras = (p.extras || []).map(function (ex) { return Object.assign({}, ex, { id: uid("extra") }); });
+      var copy = Object.assign({}, p, { id: uid("prod"), name: p.name + " (copie)", extras: copiedExtras });
+      var idx = state.products.indexOf(p);
+      state.products.splice(idx + 1, 0, copy);
+      saveState();
+      renderBody();
+      openFiche(copy.id);
+      toast("Copie créée");
+    } else if (action === "del") {
+      if (!confirm("Supprimer ce produit ?")) return;
+      state.products = state.products.filter(function (x) { return x.id !== id; });
+      selectedIds.delete(id);
+      saveState();
+      closeFiche();
+      renderBody();
+    } else if (action === "addExtra") {
+      var extraProd = prodById(id);
+      if (!extraProd) return;
+      if (!extraProd.extras) extraProd.extras = [];
+      extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0", cost: "0" });
+      saveState();
+      renderFiche();
+      scheduleBackgroundRender();
+    } else if (action === "removeExtra") {
+      var rmProd = prodById(id);
+      if (!rmProd) return;
+      if (!confirm("Supprimer cette option ?")) return;
+      var rmExtraId = btn.getAttribute("data-extra-id");
+      rmProd.extras = (rmProd.extras || []).filter(function (x) { return x.id !== rmExtraId; });
+      saveState();
+      renderFiche();
+      scheduleBackgroundRender();
+    } else if (action === "removeSale") {
+      var saleId = btn.getAttribute("data-sale-id");
+      if (!confirm("Supprimer cette vente de l'historique ?")) return;
+      state.sales = state.sales.filter(function (s) { return s.id !== saleId; });
+      saveState();
+      renderSales();
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Ventes
+  // ---------------------------------------------------------------------
+  function formatDateFr(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+  function isSameMonth(iso, ref) {
+    var d = new Date(iso);
+    return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
+  }
+  function renderSales() {
+    var sales = state.sales || [];
+    var now = new Date();
+    var thisMonth = sales.filter(function (s) { return isSameMonth(s.date, now); });
+    function sum(list, key) { return list.reduce(function (acc, s) { return acc + (parseNum(s[key]) || 0); }, 0); }
+    var margeMois = sum(thisMonth, "margin");
+    document.getElementById("salesStats").innerHTML =
+      kpi(thisMonth.length, "Ventes ce mois") +
+      kpi(formatCurrency(sum(thisMonth, "price")), "Chiffre d'affaires du mois") +
+      kpi('<span style="color:var(' + (margeMois < 0 ? "--red" : "--green") + ')">' + formatCurrency(margeMois) + "</span>", "Bénéfice du mois") +
+      kpi(sales.length, "Ventes au total · " + formatCurrency(sum(sales, "price")));
+    var counts = {};
+    sales.forEach(function (s) { counts[s.name] = (counts[s.name] || 0) + 1; });
+    var topName = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; })[0];
+    document.getElementById("salesSummaryBadge").textContent = sales.length
+      ? "· plus vendu : " + topName + " (" + counts[topName] + ")" : "";
+    var listEl = document.getElementById("salesList");
+    if (sales.length === 0) {
+      listEl.innerHTML = '<p class="soft" style="margin:0">Aucune vente enregistrée. Dans la fiche d\'un produit, le bouton « ✓ Vendu » ajoute une vente sur la plateforme choisie.</p>';
+      return;
+    }
+    var sorted = sales.slice().sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+    listEl.innerHTML = sorted.map(function (s) {
+      var pr = parseNum(s.price);
+      return '<div class="sale-row">' +
+        '<div class="soft num">' + formatDateFr(s.date) + "</div>" +
+        '<div class="sale-name">' + escapeHtml(s.name || "") + "</div>" +
+        '<div class="soft">' + escapeHtml(s.platformName || "") + "</div>" +
+        '<div class="num">' + formatCurrency(pr) + "</div>" +
+        "<div>" + pill(formatCurrency(parseNum(s.margin)), marginClass(pr > 0 ? (parseNum(s.margin) / pr * 100) : null)) + "</div>" +
+        '<button class="btn danger" data-action="removeSale" data-sale-id="' + s.id + '" title="Supprimer cette vente">✕</button></div>';
+    }).join("");
+  }
+
+  // ---------------------------------------------------------------------
+  // Réglages
+  // ---------------------------------------------------------------------
+  function updateAmortDisplay() {
+    var lifetime = parseNum(state.settings.printerLifetime);
+    var price = parseNum(state.settings.printerPrice);
+    var amort = lifetime > 0 ? price / lifetime : 0;
+    document.getElementById("s_amortDisplay").textContent = lifetime > 0 ? formatNumberPlain(amort, 4) + " €/h" : "— (durée de vie = 0)";
+  }
+
+  function renderSettingsInputs() {
+    var s = state.settings;
+    ["kwhPrice", "printerPower", "printerPrice", "printerLifetime", "socialChargeRate", "laborRate", "failureRate", "targetMargin"].forEach(function (key) {
+      var el = document.getElementById("s_" + key);
+      if (el && document.activeElement !== el) el.value = s[key];
+    });
+    updateAmortDisplay();
+    renderPlatformsSettings();
+    applySaleModeUi();
+  }
+
+  function renderPlatformsSettings() {
+    var container = document.getElementById("platformsList");
+    var canRemove = state.settings.platforms.length > 1;
+    container.innerHTML = state.settings.platforms.map(function (pl) {
+      return '<div class="plat-row champs">' +
+        '<div class="p-nom"><label>Nom</label><input type="text" data-plat-field="name" data-plat-id="' + pl.id + '" value="' + escapeHtml(pl.name) + '"></div>' +
+        '<div><label>% sur vente</label><input type="text" inputmode="decimal" data-plat-field="percent" data-plat-id="' + pl.id + '" value="' + escapeHtml(pl.percent) + '"></div>' +
+        '<div><label>Fixe (€)</label><input type="text" inputmode="decimal" data-plat-field="fixed" data-plat-id="' + pl.id + '" value="' + escapeHtml(pl.fixed) + '"></div>' +
+        '<div><button class="btn danger" data-remove-platform="' + pl.id + '"' + (canRemove ? "" : " disabled") + ' title="Supprimer cette plateforme">✕</button></div></div>';
+    }).join("");
+  }
+
+  document.getElementById("platformsList").addEventListener("input", function (e) {
+    var input = e.target.closest("[data-plat-field]"); if (!input) return;
+    var pl = state.settings.platforms.filter(function (x) { return x.id === input.getAttribute("data-plat-id"); })[0];
+    if (!pl) return;
+    pl[input.getAttribute("data-plat-field")] = input.value;
+    saveState();
+    renderBody();
+    renderSales();
+  });
+  document.getElementById("platformsList").addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-remove-platform]"); if (!btn) return;
+    if (state.settings.platforms.length <= 1) return;
+    var id = btn.getAttribute("data-remove-platform");
+    if (!confirm("Supprimer ce profil de plateforme ? Les produits qui l'utilisent basculeront sur le premier profil restant.")) return;
+    state.settings.platforms = state.settings.platforms.filter(function (x) { return x.id !== id; });
+    var fallback = state.settings.platforms[0].id;
+    state.products.forEach(function (p) { if (p.platformId === id) p.platformId = fallback; });
+    saveState();
+    renderPlatformsSettings();
+    renderBody();
+    if (ficheId) renderFiche();
+  });
+  document.getElementById("btnAddPlatform").addEventListener("click", function () {
+    state.settings.platforms.push({ id: uid("plat"), name: "Nouveau profil", percent: "0", fixed: "0" });
+    saveState();
+    renderPlatformsSettings();
+    renderBody();
+  });
+
+  document.querySelectorAll("[data-setting]").forEach(function (input) {
+    input.addEventListener("input", function () {
+      state.settings[input.getAttribute("data-setting")] = input.value;
+      saveState();
+      updateAmortDisplay();
+      renderBody();
+    });
+  });
+
+  // Mode de vente global : Pro (commission + cotisations) vs Perso (aucune charge)
+  function applySaleModeUi() {
+    var mode = state.saleMode;
+    document.querySelectorAll("[data-sale-mode]").forEach(function (btn) {
+      btn.classList.toggle("on", btn.getAttribute("data-sale-mode") === mode);
+    });
+    document.getElementById("saleModeHint").textContent = mode === "perso"
+      ? "Mode « Vente directe perso » : la commission de plateforme et les cotisations URSSAF sont ignorées sur tous les produits."
+      : "Mode « Vente pro » : la commission (selon la plateforme de chaque produit) et les cotisations URSSAF micro-entreprise s'appliquent.";
+    document.getElementById("badgePerso").classList.toggle("visually-hidden", mode !== "perso");
+  }
+  document.querySelectorAll("[data-sale-mode]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      state.saleMode = btn.getAttribute("data-sale-mode");
+      saveState();
+      applySaleModeUi();
+      renderBody();
+    });
+  });
+
+  // Export / Import JSON (comme la v1)
+  function downloadBlob(content, filename, mime) {
+    var blob = new Blob([content], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  document.getElementById("btnExportJson").addEventListener("click", function () {
+    var dateStr = new Date().toISOString().slice(0, 10);
+    downloadBlob(JSON.stringify(state, null, 2), "rentabilite-3d-" + dateStr + ".json", "application/json");
+  });
+  document.getElementById("btnImportJson").addEventListener("click", function () {
+    document.getElementById("fileImport").click();
+  });
+  document.getElementById("fileImport").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var imported = JSON.parse(reader.result);
+        if (!imported || !imported.settings || !Array.isArray(imported.products)) {
+          alert("Fichier invalide : structure inattendue.");
+          return;
+        }
+        if (!Array.isArray(imported.settings.platforms) || imported.settings.platforms.length === 0) {
+          imported.settings.platforms = defaultState().settings.platforms;
+        }
+        if (!imported.sort) imported.sort = { key: null, dir: 1 };
+        state = ensureSalesFields(imported);
+        saveState();
+        selectedIds.clear();
+        renderAll(true);
+        alert("Import réussi.");
+      } catch (err) {
+        alert("Impossible de lire ce fichier JSON.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  // Thème clair / sombre (même préférence que la v1)
+  function applyTheme(mode) {
+    if (mode === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", mode);
+    document.querySelectorAll("[data-theme-choice]").forEach(function (btn) {
+      btn.classList.toggle("on", btn.getAttribute("data-theme-choice") === mode);
+    });
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+  }
+  document.querySelectorAll("[data-theme-choice]").forEach(function (btn) {
+    btn.addEventListener("click", function () { applyTheme(btn.getAttribute("data-theme-choice")); });
+  });
+
+  // ---------------------------------------------------------------------
+  // Initialisation
+  // ---------------------------------------------------------------------
+  var savedTheme = "auto";
+  try { savedTheme = localStorage.getItem(THEME_KEY) || "auto"; } catch (e) {}
+  applyTheme(savedTheme);
+  if (!storageAvailable()) showStorageWarning();
+  showTab(["bord", "produits", "ventes", "reglages"].indexOf(ui.tab) >= 0 ? ui.tab : "bord");
+  renderAll(true);
+  updateDriveButtonUI();
+  tryAutoReconnectDrive();
+})();
+</script>
+</body>
+</html>

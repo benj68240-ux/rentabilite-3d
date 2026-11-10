@@ -4,7 +4,8 @@
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert/strict');
-const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
+// RENTA_HTML=v2/index.html node verifier_prix_min.cjs : même contrôle sur la version 2 (onglets).
+const html = fs.readFileSync(process.env.RENTA_HTML || __dirname + '/index.html', 'utf8');
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 const data = JSON.parse(fs.readFileSync(process.argv[2] || 'G:/Mon Drive/rentabilite-3d-data.json', 'utf8').replace(/^\uFEFF/, ''));
 const ctx = vm.createContext({ Math, String, isNaN, parseFloat, state: data });

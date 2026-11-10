@@ -1,7 +1,8 @@
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert/strict');
-const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
+// RENTA_HTML=v2/index.html node verifier.cjs : même contrôle sur la version 2 (onglets).
+const html = fs.readFileSync(process.env.RENTA_HTML || __dirname + '/index.html', 'utf8');
 for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
 new vm.Script(fs.readFileSync(__dirname + '/sw.js', 'utf8'));
 const code = html.slice(html.indexOf('  var WORKSHOP_FILAMENT_PRICE'), html.indexOf('  // Certains navigateurs mobiles'));
@@ -10,7 +11,7 @@ const context = vm.createContext({
   uid: () => 'test-id', embaseTitle: (name, type) => name + ' ' + type,
   STORAGE_KEY: 'test', console, Date, JSON, String,
   localStorage: {getItem: () => stored || null, setItem: (_, value) => {stored = value;}},
-  hideStorageWarning() {}, showStorageWarning() {}, scheduleDriveUpload() {}, renderBody() {}
+  hideStorageWarning() {}, showStorageWarning() {}, scheduleDriveUpload() {}, renderBody() {}, openFiche() {}
 });
 vm.runInContext(code, context);
 assert.equal(context.state.products[0].filamentPrice, '15');
