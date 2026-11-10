@@ -10,7 +10,23 @@ const data = JSON.parse(fs.readFileSync(process.argv[2] || 'G:/Mon Drive/rentabi
 const ctx = vm.createContext({ Math, String, isNaN, parseFloat, state: data });
 vm.runInContext(cut('  function parseNum(v)', '  function formatCurrency(n)'), ctx);
 vm.runInContext('function findPlatform(id){return state.settings.platforms.filter(function(p){return p.id===id;})[0];}', ctx);
-vm.runInContext(cut('  function computeRow(p)', '  function marginClass(percent)'), ctx);
+vm.runInContext(cut('  function findSitePlatform()', '  function marginClass(percent)'), ctx);
+// Marge site (11/11/2026) : écart avec la marge de la ligne = frais de sa plateforme - frais Stripe.
+const site = data.settings.platforms.find(p => /^site/i.test(p.name));
+assert(site, 'profil Site internet absent du Drive');
+for (const p of data.products) {
+  const c = ctx.computeRow(p), pr = ctx.parseNum(p.price);
+  const fraisSite = pr * ctx.parseNum(site.percent) / 100 + ctx.parseNum(site.fixed);
+  assert(Math.abs(c.siteMargin - (c.netMargin + c.platformCost - fraisSite)) < 1e-9, p.name);
+  if (p.platformId === site.id) assert(Math.abs(c.siteMargin - c.netMargin) < 1e-9, p.name);
+}
+const sansSite = vm.createContext({ Math, String, isNaN, parseFloat, state: { settings: Object.assign({}, data.settings, { platforms: data.settings.platforms.filter(p => p !== site) }) } });
+vm.runInContext(cut('  function parseNum(v)', '  function formatCurrency(n)'), sansSite);
+vm.runInContext('function findPlatform(id){return state.settings.platforms.filter(function(p){return p.id===id;})[0];}', sansSite);
+vm.runInContext(cut('  function findSitePlatform()', '  function marginClass(percent)'), sansSite);
+assert.equal(sansSite.computeRow(data.products[0]).siteMargin, null);
+const aurore = data.products.find(p => p.name.startsWith('Lampe Aurore M'));
+console.log('OK : marge site. Aurore M : ligne', ctx.computeRow(aurore).netMargin.toFixed(2), '/ site', ctx.computeRow(aurore).siteMargin.toFixed(2));
 const signales = [];
 for (const p of data.products) {
   const c = ctx.computeRow(p);

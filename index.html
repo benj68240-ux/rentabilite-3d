@@ -1116,6 +1116,12 @@
     p.name = embaseTitle(p.name, newType);
   }
 
+  function findSitePlatform() {
+    return state.settings.platforms.filter(function (pl) {
+      return /^site/i.test(String(pl.name || "").trim());
+    })[0] || null;
+  }
+
   function computeRow(p) {
     var s = state.settings;
     var price = parseNum(p.price);
@@ -1172,6 +1178,16 @@
 
     var netMargin = price - totalCost;
     var netMarginPercent = price > 0 ? (netMargin / price * 100) : null;
+
+    // Marge si le même produit était vendu sur le site (profil « Site internet »,
+    // frais Stripe), au même prix, quelle que soit la plateforme de la ligne (Benjamin, 11/11/2026).
+    var site = findSitePlatform();
+    var siteMargin = null, siteMarginPercent = null;
+    if (site) {
+      var siteFees = isPerso ? 0 : price * parseNum(site.percent) / 100 + parseNum(site.fixed);
+      siteMargin = price - (totalCost - platformCost + siteFees);
+      siteMarginPercent = price > 0 ? (siteMargin / price * 100) : null;
+    }
     var marginPerHour = totalPrintTime > 0 ? (netMargin / totalPrintTime) : null;
 
     var fixedCosts = materialCost + energyCost + laborCost + packaging + accessories + extrasCost;
@@ -1198,6 +1214,7 @@
       packagingPercent: packagingPercent, accessoriesPercent: accessoriesPercent,
       netMargin: netMargin, netMarginPercent: netMarginPercent, minPrice: minPrice,
       belowMin: belowMin, suggestedPrice: suggestedPrice,
+      siteMargin: siteMargin, siteMarginPercent: siteMarginPercent,
       amortization: amortization, totalPrintTime: totalPrintTime, marginPerHour: marginPerHour
     };
   }
@@ -1242,6 +1259,7 @@
     { key: "netMargin", label: "Marge nette (€)", fmt: formatCurrency, isMargin: true },
     { key: "netMarginPercent", label: "Marge nette (%)", fmt: formatPercent, isMargin: true },
     { key: "marginPerHour", label: "Rentabilité (€/h machine)", fmt: formatCurrency, isMargin: true },
+    { key: "siteMargin", label: "Marge si vendu sur le site (€)", fmt: formatCurrency, isMargin: true, marginPctKey: "siteMarginPercent" },
     { key: "minPrice", label: "Prix min. cible (€)", fmt: formatCurrency }
   ];
 
@@ -1462,7 +1480,7 @@
       var val = c[f.key];
       var cellId = "computed_" + f.key + "_" + p.id;
       if (f.isMargin) {
-        var cls2 = marginClass(f.key === "netMarginPercent" ? c.netMarginPercent : c.netMarginPercent);
+        var cls2 = marginClass(c[f.marginPctKey || "netMarginPercent"]);
         html += '<td class="computed num tabular" id="' + cellId + '" data-label="' + escapeHtml(f.label) + '"><span class="margin-cell ' + cls2 + '">' + f.fmt(val) + "</span></td>";
       } else {
         html += '<td class="computed num tabular cell-detail" id="' + cellId + '" data-label="' + escapeHtml(f.label) + '">' + costCellContent(f, c) + "</td>";
@@ -1532,7 +1550,7 @@
       var cell = document.getElementById("computed_" + f.key + "_" + id);
       if (!cell) return;
       if (f.isMargin) {
-        var cls2 = marginClass(c.netMarginPercent);
+        var cls2 = marginClass(c[f.marginPctKey || "netMarginPercent"]);
         cell.innerHTML = '<span class="margin-cell ' + cls2 + '">' + f.fmt(c[f.key]) + "</span>";
       } else {
         cell.innerHTML = costCellContent(f, c);
@@ -1558,7 +1576,8 @@
     var isSelection = selectedIds.size > 0;
     var list = isSelection ? state.products.filter(function (p) { return selectedIds.has(p.id); }) : state.products;
     var n = list.length;
-    var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, priceLinkedCost: 0, netMargin: 0, packaging: 0, accessories: 0, totalPrintTime: 0 };
+    var sums = { price: 0, materialCost: 0, energyCost: 0, platformCost: 0, socialCost: 0, laborCost: 0, totalCost: 0, priceLinkedCost: 0, netMargin: 0, packaging: 0, accessories: 0, totalPrintTime: 0, siteMargin: 0 };
+    var hasSite = !!findSitePlatform();
 
     list.forEach(function (p) {
       var c = computeRow(p);
@@ -1574,7 +1593,9 @@
       sums.packaging += parseNum(p.packaging);
       sums.accessories += parseNum(p.accessories);
       sums.totalPrintTime += c.totalPrintTime;
+      if (c.siteMargin !== null) sums.siteMargin += c.siteMargin;
     });
+    var siteMarginPercentTotal = hasSite && sums.price > 0 ? (sums.siteMargin / sums.price * 100) : null;
 
     // Marge % globale = somme des marges € ÷ somme des prix € (et non une
     // moyenne des % individuels) : un article offert à 0 € doit faire
@@ -1601,6 +1622,7 @@
     html += '<td class="num tabular" data-label="Marge nette (€)">' + formatCurrency(sums.netMargin) + "</td>";
     html += '<td class="num tabular" data-label="Marge nette (%)"><span class="margin-cell ' + marginClass(avgMarginPercent) + '">' + formatPercent(avgMarginPercent) + " (moy.)</span></td>";
     html += '<td class="num tabular" data-label="Rentabilité (€/h machine)"><span class="margin-cell ' + marginClass(avgMarginPercent) + '">' + formatCurrency(avgMarginPerHour) + "</span></td>";
+    html += '<td class="num tabular" data-label="Marge si vendu sur le site (€)"><span class="margin-cell ' + marginClass(siteMarginPercentTotal) + '">' + formatCurrency(hasSite ? sums.siteMargin : null) + "</span></td>";
     html += '<td class="cell-detail"></td>';
     row.innerHTML = html;
     row.classList.toggle("row-collapsed", !!state.totalsCollapsed);
