@@ -320,6 +320,9 @@
   tr.row-selected { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 12px; }
   td.cell-name .btn.small { flex-shrink: 0; white-space: nowrap; }
   td.cell-name .btn.small.unlocked { background: var(--orange-bg); color: var(--orange); border-color: var(--orange); }
+  /* Alerte prix sous le prix minimum cible (Benjamin, 10/11/2026) */
+  .btn.small.min-alert { color: var(--red); background: var(--red-bg); border-color: var(--red); font-weight: 600; }
+  .min-price-low { color: var(--red); font-weight: 600; }
   table input[type="text"].cell-input:hover { border-color: var(--border); }
   table input[type="text"].cell-input:focus { border-color: var(--accent); background: var(--surface-2); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
   table input[type="text"].cell-input:read-only { cursor: default; opacity: 0.8; }
@@ -1175,6 +1178,14 @@
     var targetMargin = parseNum(s.targetMargin);
     var denom = 1 - platformPercent / 100 - socialRate / 100 - targetMargin / 100;
     var minPrice = denom > 0 ? (fixedCosts + platformFixed) / denom : null;
+    // Prix sous le minimum cible : alerte + prix conseillé « en ,90 » juste au-dessus
+    // (même arrondi que prix_conseille.py, Benjamin 10/11/2026).
+    var belowMin = minPrice !== null && price < minPrice - 0.005;
+    var suggestedPrice = null;
+    if (minPrice !== null) {
+      suggestedPrice = Math.floor(minPrice) + 0.9;
+      if (suggestedPrice < minPrice - 1e-9) suggestedPrice += 1;
+    }
 
     return {
       materialCost: materialCost, energyCost: energyCost, platformCost: platformCost,
@@ -1186,6 +1197,7 @@
       laborCostPercent: laborCostPercent,
       packagingPercent: packagingPercent, accessoriesPercent: accessoriesPercent,
       netMargin: netMargin, netMarginPercent: netMarginPercent, minPrice: minPrice,
+      belowMin: belowMin, suggestedPrice: suggestedPrice,
       amortization: amortization, totalPrintTime: totalPrintTime, marginPerHour: marginPerHour
     };
   }
@@ -1437,7 +1449,8 @@
           var checkedAttr = selectedIds.has(p.id) ? " checked" : "";
           var unlockBtn = '<button class="btn small' + (isUnlocked ? " unlocked" : "") + '" data-action="unlock" data-id="' + p.id + '" title="' + (isUnlocked ? "Verrouiller l\'édition" : "Déverrouiller pour modifier ou supprimer") + '">' + (isUnlocked ? "🔓 Verrouiller" : "✏ Modifier") + "</button>";
           inputHtml = '<input type="checkbox" class="row-select" data-id="' + p.id + '" aria-label="Sélectionner ce produit"' + checkedAttr + '>' +
-            '<button class="row-toggle" data-action="toggle" data-id="' + p.id + '" aria-label="Afficher/masquer les détails" title="Afficher/masquer les détails">▾</button>' + inputHtml + unlockBtn;
+            '<button class="row-toggle" data-action="toggle" data-id="' + p.id + '" aria-label="Afficher/masquer les détails" title="Afficher/masquer les détails">▾</button>' + inputHtml + unlockBtn +
+            '<span id="alert_' + p.id + '">' + minAlertHtml(p.id, c) + '</span>';
         }
         html += '<td class="' + cls + '" data-label="' + escapeHtml(f.label) + '">' + inputHtml + "</td>";
       }
@@ -1469,7 +1482,14 @@
     return '<tr data-row-id="' + p.id + '" class="' + trCls + '">' + html + "</tr>";
   }
 
+  function minAlertHtml(id, c) {
+    if (!c.belowMin || c.suggestedPrice === null) return "";
+    return '<button class="btn small min-alert" data-action="applyMin" data-id="' + id + '" title="Prix sous le prix minimum cible (' +
+      formatCurrency(c.minPrice) + ') : cliquer pour passer au prix conseillé">⚠ Sous le min. → ' + formatCurrency(c.suggestedPrice) + "</button>";
+  }
+
   function costCellContent(f, c) {
+    if (f.key === "minPrice" && c.belowMin) return '<span class="min-price-low">⚠ ' + f.fmt(c.minPrice) + "</span>";
     var inner = f.fmt(c[f.key]);
     if (f.percentKey) inner += ' <span class="cost-percent">' + formatPercent(c[f.percentKey]) + "</span>";
     return inner;
@@ -1523,6 +1543,8 @@
       var pctEl = document.getElementById("pct_" + f.key + "_" + id);
       if (pctEl) pctEl.textContent = formatPercent(c[f.percentKey]);
     });
+    var alertEl = document.getElementById("alert_" + id);
+    if (alertEl) alertEl.innerHTML = minAlertHtml(id, c);
   }
 
   function recomputeAllRows() {
@@ -1863,6 +1885,16 @@
       });
       saveState();
       renderSales();
+    } else if (action === "applyMin") {
+      var minProd = state.products.filter(function (x) { return x.id === id; })[0];
+      if (!minProd) return;
+      var mc = computeRow(minProd);
+      if (!mc.belowMin || mc.suggestedPrice === null) return;
+      if (!confirm("Passer « " + minProd.name + " » de " + formatCurrency(parseNum(minProd.price)) + " à " +
+          formatCurrency(mc.suggestedPrice) + " ?\n(prix minimum pour ta marge cible : " + formatCurrency(mc.minPrice) + ")")) return;
+      minProd.price = mc.suggestedPrice.toFixed(2).replace(".", ",");
+      saveState();
+      renderBody();
     } else if (action === "dup") {
       var p = state.products.filter(function (x) { return x.id === id; })[0];
       if (!p) return;
