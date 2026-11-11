@@ -1,4 +1,4 @@
-var CACHE_NAME = "ab-rentabilite-v15";
+var CACHE_NAME = "ab-rentabilite-v16";
 var CORE_ASSETS = [
   "./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./brand-banner.jpg",
   "./fonts/Inter-Regular.woff2", "./fonts/Inter-Medium.woff2",

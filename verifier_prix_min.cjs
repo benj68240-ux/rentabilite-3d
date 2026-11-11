@@ -8,6 +8,8 @@ const assert = require('assert/strict');
 const html = fs.readFileSync(process.env.RENTA_HTML || __dirname + '/index.html', 'utf8');
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 const data = JSON.parse(fs.readFileSync(process.argv[2] || 'G:/Mon Drive/rentabilite-3d-data.json', 'utf8').replace(/^\uFEFF/, ''));
+// Contrôles faits en mode « vente pro » (frais + URSSAF), même si le Drive a été laissé en mode perso.
+data.saleMode = 'pro';
 const ctx = vm.createContext({ Math, String, isNaN, parseFloat, state: data });
 vm.runInContext(cut('  function parseNum(v)', '  function formatCurrency(n)'), ctx);
 vm.runInContext('function findPlatform(id){return state.settings.platforms.filter(function(p){return p.id===id;})[0];}', ctx);
