@@ -1372,13 +1372,18 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
     var price = parseNum(p.price);
     var lo = price > 0 ? Math.max(1, Math.floor(price * 0.6)) : 0, hi = price > 0 ? Math.ceil(price * 1.5) : 100;
     document.getElementById("ficheDyn").innerHTML =
-      '<div class="card"><h3>Combien il te rapporte</h3><div class="compare">' + plats.map(function (x) {
+      // Mode de vente modifiable ici aussi (Benjamin, 11/11/2026, option A) : même réglage que l'onglet Réglages.
+      '<div class="card"><h3>Combien il te rapporte</h3>' +
+      '<div class="outils" role="group" aria-label="Mode de vente"><span class="soft">Mode :</span>' +
+        '<button class="btn' + (state.saleMode !== "perso" ? " on" : "") + '" data-action="saleMode" data-mode="pro">Vente pro</button>' +
+        '<button class="btn' + (state.saleMode === "perso" ? " on" : "") + '" data-action="saleMode" data-mode="perso">Vente directe (perso)</button></div>' +
+      '<div class="compare">' + plats.map(function (x) {
         var cur = x.pl.id === p.platformId;
         return '<div class="plat' + (x === best ? " best" : "") + '"><h4>' + escapeHtml(x.pl.name) + (x === best ? " 🏆" : "") + (cur ? ' <span class="soft">(actuelle)</span>' : "") + "</h4>" +
           '<div class="m">' + pill(formatCurrency(x.c.netMargin), marginClass(x.c.netMarginPercent)) + "</div>" +
           '<div class="d">' + pct0(x.c.netMarginPercent) + " · frais " + formatCurrency(x.c.platformCost) + "<br>prix min. " + formatCurrency(x.c.minPrice) +
           "<br>" + formatCurrency(x.c.marginPerHour) + "/h machine</div></div>";
-      }).join("") + "</div>" + (state.saleMode === "perso" ? '<p class="note">Mode vente directe : frais de plateforme et URSSAF ignorés partout.</p>' : "") + "</div>" +
+      }).join("") + "</div>" + (state.saleMode === "perso" ? '<p class="note">Mode vente directe : frais de plateforme et URSSAF ignorés sur tous les produits.</p>' : "") + "</div>" +
       '<div class="card"><h3>Où part l\'argent (vente ' + escapeHtml(platformLabel(p)) + " à " + formatCurrency(price) + ")</h3>" + depensesHtml(p, c) +
         '<p class="soft" style="margin:10px 0 0">Prix min. pour ' + formatNumberPlain(parseNum(state.settings.targetMargin), 0) + " % de marge : <b>" + formatCurrency(c.minPrice) + "</b>" +
         (c.suggestedPrice !== null ? " · prix conseillé : <b>" + formatCurrency(c.suggestedPrice) + "</b>" : "") + "</p></div>" +
@@ -1437,6 +1442,14 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
     var action = btn.getAttribute("data-action");
     if (action === "close") {
       closeFiche();
+    } else if (action === "saleMode") {
+      var mode = btn.getAttribute("data-mode") === "perso" ? "perso" : "pro";
+      if (state.saleMode === mode) return;
+      state.saleMode = mode;
+      saveState();
+      applySaleModeUi();
+      renderBody();
+      toast(mode === "perso" ? "Mode vente directe (perso) : sans frais ni URSSAF" : "Mode vente pro : frais et URSSAF comptés");
     } else if (action === "applyMin") {
       var minProd = prodById(id);
       if (!minProd) return;
