@@ -126,7 +126,7 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
 .champs input[readonly] { background: var(--surface-2); color: var(--soft); }
 .champs input:focus, .champs select:focus, .extra input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
 .champs .pct { font-size: 11px; color: var(--soft); }
-.extra { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)) auto; gap: 6px; align-items: end; margin-bottom: 8px; }
+.extra { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)) auto; gap: 6px; align-items: end; margin-bottom: 8px; }
 .extra label { font-size: 11px; color: var(--soft); display: block; }
 .extra input { width: 100%; min-width: 0; padding: 6px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; font-size: 13.5px; }
 .depenses { display: grid; grid-template-columns: minmax(80px, 128px) minmax(0, 1fr) auto auto; gap: 7px 10px; align-items: center; font-size: 13px; }
@@ -177,7 +177,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
   .prod .c-marge .pill::before { content: "Marge "; font-weight: 400; }
   .prod .c-site .pill::before { content: "Site "; font-weight: 400; }
   .champs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .extra { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .extra { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .extra .e-nom { grid-column: 1 / -1; }
   .plat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .plat-row .p-nom { grid-column: 1 / -2; }
@@ -391,6 +391,26 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       s.persoBase = "1";
     }
     s.saleMode = "pro";
+    // Passage unique (Benjamin, 13/11/2026) : la Suspension se vend 12 € seule, et 8 € en option
+    // sur les lampes Aurore (option reprise du produit Suspension : poids, temps, coût des pièces).
+    if (s.suspensionBase !== "1") {
+      s.suspensionBase = "1";
+      var susp = s.products.filter(function (p) { return /^suspension$/i.test(String(p.name || "").trim()); })[0];
+      if (susp) {
+        susp.price = "12";
+        var suspCost = nonNeg(susp.accessories);
+        (susp.extras || []).forEach(function (ex) { suspCost += nonNeg(ex.cost); });
+        s.products.forEach(function (p) {
+          if (!/^lampe aurore/i.test(String(p.name || "").trim())) return;
+          if (!Array.isArray(p.extras)) p.extras = [];
+          if (p.extras.some(function (ex) { return /suspension/i.test(String(ex.name || "")); })) return;
+          p.extras.push({
+            id: "extra_suspension_" + p.id, name: "Suspension", weight: String(nonNeg(susp.weight)),
+            time: String(nonNeg(susp.printTime)), cost: String(roundTo(suspCost, 2)), price: "8"
+          });
+        });
+      }
+    }
     // Passage unique : main d'œuvre à 0 -> 10 min ; ensuite un 0 saisi volontairement est conservé.
     var migrateLabor = s.laborBase !== WORKSHOP_LABOR;
     s.laborBase = WORKSHOP_LABOR;
@@ -446,7 +466,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       socialRateBase: WORKSHOP_SOCIAL_RATE,
       packagingBase: WORKSHOP_PACKAGING,
       laborBase: WORKSHOP_LABOR,
-      persoBase: "1"
+      persoBase: "1",
+      suspensionBase: "1"
     };
   }
 
@@ -1067,6 +1088,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     })[0] || null;
   }
 
+  function isSoldOption(ex) { return nonNeg(ex.price) > 0; }
+
   function computeRow(p) {
     var s = state.settings;
     var price = nonNeg(p.price);
@@ -1079,14 +1102,22 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     // Port payé par l'acheteur et reversé au transporteur : ni recette ni dépense pour la marge,
     // mais il entre dans la base de la commission de plateforme et des cotisations URSSAF.
     var shipping = nonNeg(p.shipping);
-    var feeBase = price + shipping;
 
+    // Une option qui a un prix de vente (ex. Suspension à 8 € sur une lampe) est facultative :
+    // elle ne compte que si on demande le calcul « avec option » (p.withOptions, jamais enregistré),
+    // et son prix s'ajoute alors au prix du produit. Sans prix, la ligne est toujours comptée.
+    var withOptions = p.withOptions;
     var extrasWeight = 0, extrasTime = 0, extrasCost = 0;
     (p.extras || []).forEach(function (ex) {
+      if (isSoldOption(ex)) {
+        if (!(withOptions === "all" || (withOptions && withOptions.indexOf(ex.id) >= 0))) return;
+        price += nonNeg(ex.price);
+      }
       extrasWeight += nonNeg(ex.weight);
       extrasTime += nonNeg(ex.time);
       extrasCost += nonNeg(ex.cost);
     });
+    var feeBase = price + shipping;
     var totalWeight = weight + extrasWeight;
     var totalPrintTime = printTime + extrasTime;
 
@@ -1159,7 +1190,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       socialCost: socialCost, laborCost: laborCost, totalCost: totalCost,
       // Part des coûts proportionnelle au prix (commission % + cotisations) : baisse avec une réduction.
       priceLinkedCost: price * (platformPercent + socialRate) / 100,
-      shipping: shipping, shippingFees: shippingFees, isPerso: isPerso,
+      shipping: shipping, shippingFees: shippingFees, isPerso: isPerso, price: price,
       materialCostPercent: materialCostPercent, energyCostPercent: energyCostPercent,
       platformCostPercent: platformCostPercent, socialCostPercent: socialCostPercent,
       laborCostPercent: laborCostPercent,
@@ -1220,6 +1251,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
   function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) {} }
 
   var selectedIds = new Set();
+  // Options cochées pour la prochaine vente de la fiche ouverte.
+  var soldOptionIds = new Set();
   var ficheId = null;
 
   var toastTimer = null;
@@ -1505,6 +1538,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     if (!ficheId && !(history.state && history.state.fiche)) {
       try { history.pushState({ fiche: true }, ""); } catch (e) {}
     }
+    if (ficheId !== id) soldOptionIds.clear();
     ficheId = id;
     document.getElementById("voile").classList.add("on");
     document.getElementById("fiche").classList.add("on");
@@ -1547,10 +1581,11 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
           ' data-id="' + p.id + '" data-extra-id="' + ex.id + '" data-extra-field="' + field + '" value="' + escapeHtml(ex[field] || "") + '"' +
           (field !== "name" && !isValidNumberInput(ex[field]) ? ' class="invalide"' : "") + "></div>";
       }
-      return '<div class="extra">' + f("name", "Nom", "e-nom") + f("weight", "Poids (g)") + f("time", "Temps (h)") + f("cost", "Coût pièce (€)") +
+      return '<div class="extra">' + f("name", "Nom", "e-nom") + f("weight", "Poids (g)") + f("time", "Temps (h)") + f("cost", "Coût pièce (€)") + f("price", "Prix vendu (€)") +
         '<div><button class="btn danger" data-action="removeExtra" data-id="' + p.id + '" data-extra-id="' + ex.id + '" title="Supprimer cette option">✕</button></div></div>';
     }).join("");
-    return rows + '<button class="btn" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une option</button>';
+    return rows + '<button class="btn" data-action="addExtra" data-id="' + p.id + '">+ Ajouter une option</button>' +
+      '<p class="soft" style="margin:8px 0 0">Avec un « prix vendu », l\'option est facultative : elle n\'entre pas dans le calcul du produit seul (voir « Options vendues en plus »). Sans prix, la ligne est toujours comptée dans le coût.</p>';
   }
 
   function renderFiche() {
@@ -1600,6 +1635,23 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       ligne(c.netMargin < 0 ? '<b style="color:var(--red)">Ta marge</b>' : "<b>Ta marge</b>", c.netMargin, "marge") + "</div>";
   }
 
+  // Options vendues en plus (ex. Suspension à 8 € sur une lampe) : ce que chacune rapporte en plus,
+  // et case à cocher pour l'inclure dans la prochaine vente enregistrée avec « ✓ Vendu ».
+  function soldOptionsHtml(p, c) {
+    var opts = (p.extras || []).filter(isSoldOption);
+    if (!opts.length) return "";
+    var all = computeWith(p, { withOptions: "all" });
+    return '<div class="card"><h3>Options vendues en plus (vente ' + escapeHtml(platformLabel(p)) + ")</h3>" + opts.map(function (ex) {
+      var prix = nonNeg(ex.price), gain = computeWith(p, { withOptions: [ex.id] }).netMargin - c.netMargin;
+      return '<div class="ligne-simple"><label style="display:flex;gap:8px;align-items:center;min-width:0"><input type="checkbox" data-sold-option="' + ex.id + '"' +
+        (soldOptionIds.has(ex.id) ? " checked" : "") + ' style="width:18px;height:18px;margin:0;accent-color:var(--accent)"><span>' + escapeHtml(ex.name || "Option") +
+        ' <span class="soft">+' + formatCurrency(prix) + "</span></span></label>" +
+        pill((gain >= 0 ? "+" : "") + formatCurrency(gain) + " de marge", marginClass(gain / prix * 100)) + "</div>";
+    }).join("") +
+      '<p class="soft" style="margin:8px 0 0">' + (opts.length > 1 ? "Avec toutes les options" : "Avec l'option") + " : vendu <b>" + formatCurrency(all.price) + "</b>, marge <b>" +
+      formatCurrency(all.netMargin) + "</b> (" + pct0(all.netMarginPercent) + "). Coche une option pour l'inclure dans la vente enregistrée avec « ✓ Vendu ».</p></div>";
+  }
+
   function renderFicheDyn() {
     var p = prodById(ficheId);
     if (!p || !document.getElementById("ficheDyn")) return;
@@ -1634,6 +1686,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
         (c.suggestedPrice !== null ? " · prix conseillé : <b>" + formatCurrency(c.suggestedPrice) + "</b>" : "") + "</p>" +
         (c.shipping > 0 ? '<p class="note">Port ' + formatCurrency(c.shipping) + " payé par l'acheteur : hors marge. L'acheteur paie " + formatCurrency(price + c.shipping) +
           (c.isPerso ? "." : " ; la commission et l'URSSAF sont calculées sur ce total (dont " + formatCurrency(c.shippingFees) + " prélevés sur le port).") + "</p>" : "") + "</div>" +
+      soldOptionsHtml(p, c) +
       '<div class="card simu"><h3>Et si je change le prix ?</h3><input type="range" id="simu" aria-label="Prix simulé" min="' + lo + '" max="' + hi + '" step="0.1" value="' + Math.min(hi, Math.max(lo, price)) + '">' +
         '<div class="vendu"><div id="simuRes" class="soft" style="flex:1 1 220px"></div><button class="btn" data-action="useSimu" data-id="' + p.id + '">Utiliser ce prix</button></div></div>';
     updateSimu();
@@ -1679,7 +1732,9 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
   });
   fiche.addEventListener("change", function (e) {
     var t = e.target, p = prodById(ficheId); if (!p) return;
-    if (t.matches("input.titre")) {
+    if (t.matches("[data-sold-option]")) {
+      if (t.checked) soldOptionIds.add(t.getAttribute("data-sold-option")); else soldOptionIds.delete(t.getAttribute("data-sold-option"));
+    } else if (t.matches("input.titre")) {
       // Nom validé : la catégorie et le choix d'embase (lampes) suivent le nouveau nom.
       renderFiche();
     } else if (t.matches('select[data-field="platformId"]')) {
@@ -1747,7 +1802,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       lastSoldAt = Date.now();
       var sp = document.getElementById("soldPlatform");
       var soldPlatformId = sp && sp.value ? sp.value : soldProd.platformId;
-      var c = computeWith(soldProd, { platformId: soldPlatformId });
+      var soldOpts = (soldProd.extras || []).filter(function (ex) { return isSoldOption(ex) && soldOptionIds.has(ex.id); });
+      var c = computeWith(soldProd, { platformId: soldPlatformId, withOptions: soldOpts.map(function (ex) { return ex.id; }) });
       var platform = findPlatform(soldPlatformId);
       // Les ventes perso ne sont pas comptabilisées (Benjamin, 13/11/2026).
       if (platform && platform.perso) { toast("Vente perso : non comptabilisée"); return; }
@@ -1755,8 +1811,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       state.sales.push({
         id: saleId,
         productId: soldProd.id,
-        name: soldProd.name,
-        price: nonNeg(soldProd.price),
+        name: soldProd.name + soldOpts.map(function (ex) { return " + " + (ex.name || "Option"); }).join(""),
+        price: c.price,
         shipping: c.shipping,
         cost: c.totalCost,
         margin: c.netMargin,
@@ -1795,7 +1851,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       var extraProd = prodById(id);
       if (!extraProd) return;
       if (!extraProd.extras) extraProd.extras = [];
-      extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0", cost: "0" });
+      extraProd.extras.push({ id: uid("extra"), name: "", weight: "0", time: "0", cost: "0", price: "" });
       saveState();
       renderFiche();
       scheduleBackgroundRender();

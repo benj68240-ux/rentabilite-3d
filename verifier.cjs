@@ -111,6 +111,18 @@ assert.equal(context.contentKey(context.mergeStates(tel, pc)), context.contentKe
 const tel2 = save(tel, '2026-11-13T10:10:00.000Z', s => { s.products[1].price = '10'; });
 assert.equal(context.mergeStates(pc, tel2).products[1].price, '10');
 
+// Suspension : 12 € seule, 8 € en option sur les lampes Aurore (passage unique).
+const cat = {settings: {platforms: [{id: 'e', name: 'Etsy', percent: '10', fixed: '0'}]}, products: [
+  {id: 'a', name: 'Lampe Aurore S + Embase E27', price: '49', extras: []},
+  {id: 'b', name: 'Lampe Cristal', price: '31'},
+  {id: 's', name: 'Suspension', price: '8', weight: '58', printTime: '2', accessories: '0', extras: [{id: 'x', name: 'Corde', cost: '0.5'}]}]};
+context.normalizeImported(cat);
+assert.equal(cat.products[2].price, '12');
+assert.deepEqual(clone(cat.products[0].extras), [{id: 'extra_suspension_a', name: 'Suspension', weight: '58', time: '2', cost: '0.5', price: '8'}]);
+assert.equal(cat.products[1].extras, undefined);
+cat.products[2].price = '13'; cat.products[0].extras = [];
+context.normalizeImported(cat);
+assert.equal(cat.products[2].price, '13'); assert.equal(cat.products[0].extras.length, 0);   // une seule fois
 // Vente perso : un choix de vente par produit, plus de mode global.
 assert(!html.includes('data-sale-mode') && !html.includes('action === "saleMode"'));
 assert(html.includes('if (platform && platform.perso) { toast("Vente perso : non comptabilisée"); return; }'));
