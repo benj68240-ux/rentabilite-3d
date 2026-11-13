@@ -111,6 +111,10 @@ assert.equal(context.contentKey(context.mergeStates(tel, pc)), context.contentKe
 const tel2 = save(tel, '2026-11-13T10:10:00.000Z', s => { s.products[1].price = '10'; });
 assert.equal(context.mergeStates(pc, tel2).products[1].price, '10');
 
-assert(html.includes('if (state.saleMode === "perso") { toast("Mode vente directe (perso) : vente non comptabilisée"); return; }'));
+// Vente perso : un choix de vente par produit, plus de mode global.
+assert(!html.includes('data-sale-mode') && !html.includes('action === "saleMode"'));
+assert(html.includes('if (platform && platform.perso) { toast("Vente perso : non comptabilisée"); return; }'));
+assert.deepEqual(clone(base.settings.platforms.map(p => [p.name, !!p.perso])), [['Etsy', false], ['Vente perso', true], ['Site internet', false]]);
+assert.equal(base.saleMode, 'pro');
 assert(/origin !== self\.location\.origin\) return;/.test(fs.readFileSync(__dirname + '/sw.js', 'utf8')));
 console.log('OK : syntaxe, saisies, valeurs par défaut (main d\'œuvre 10 min, port 5 €), passages uniques, embase, fusion entre appareils.');
