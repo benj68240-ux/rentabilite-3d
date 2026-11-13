@@ -1,4 +1,4 @@
-var CACHE_NAME = "ab-rentabilite-v17";
+var CACHE_NAME = "ab-rentabilite-v18";
 var CORE_ASSETS = [
   "./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./brand-banner.jpg",
   "./fonts/Inter-Regular.woff2", "./fonts/Inter-Medium.woff2",
@@ -38,18 +38,26 @@ function freshFetch(request) {
 
 self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") return;
+  // Uniquement les fichiers du site : les appels à Google (Drive, connexion) passent directement
+  // par le réseau et ne sont jamais mis en cache ni resservis périmés (13/11/2026).
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     freshFetch(event.request)
       .then(function (response) {
-        var copy = response.clone();
-        caches.open(CACHE_NAME).then(function (cache) { cache.put(event.request, copy); });
+        // On ne garde que les réponses valides (pas les erreurs 404 / 500).
+        if (response.ok) {
+          var copy = response.clone();
+          caches.open(CACHE_NAME).then(function (cache) { cache.put(event.request, copy); });
+        }
         return response;
       })
       .catch(function () {
         return caches.match(event.request).then(function (cached) {
-          return cached || caches.match("./index.html");
+          if (cached) return cached;
+          // La page d'accueil ne remplace qu'une page, jamais un script ou une image.
+          if (event.request.mode === "navigate") return caches.match("./index.html");
+          return Response.error();
         });
       })
   );
 });
-

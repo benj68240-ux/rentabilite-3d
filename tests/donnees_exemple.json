@@ -1,0 +1,21 @@
+{
+  "settings": {
+    "kwhPrice": "0,25", "printerPower": "150", "printerPrice": "500", "printerLifetime": "2000",
+    "socialChargeRate": "12,3", "laborRate": "15", "failureRate": "10", "targetMargin": "30",
+    "platforms": [
+      {"id": "plat_etsy", "name": "Etsy", "percent": "11,64", "fixed": "0,47"},
+      {"id": "plat_direct", "name": "Vente directe", "percent": "0", "fixed": "0"},
+      {"id": "plat_site", "name": "Site internet", "percent": "1,5", "fixed": "0,25"}
+    ]
+  },
+  "products": [
+    {"id": "prod_1", "name": "Lampe Test M + Embase E27 (P1S)", "price": "54", "weight": "200", "filamentPrice": "20", "printTime": "3", "laborTime": "20", "packaging": "2", "accessories": "9", "platformId": "plat_etsy", "extras": [], "embaseType": "E27"},
+    {"id": "prod_2", "name": "Suspension test (A1)", "price": "8", "weight": "58", "filamentPrice": "15", "printTime": "2", "laborTime": "0", "packaging": "2", "accessories": "0", "platformId": "plat_etsy", "extras": [{"id": "extra_1", "name": "Corde", "weight": "0", "time": "0", "cost": "0.5"}]},
+    {"id": "prod_3", "name": "Vase test", "price": "19", "weight": "118.2", "filamentPrice": "15", "printTime": "3.17", "laborTime": "", "packaging": "0,80", "accessories": "2", "platformId": "plat_site", "extras": []},
+    {"id": "prod_4", "name": "Lampe Cristal test", "price": "31", "weight": "24.299999999999997", "filamentPrice": "15", "printTime": "2.12", "laborTime": "5", "packaging": "1.5", "accessories": "10", "shipping": "0", "platformId": "plat_etsy", "extras": [], "embaseType": "NONE"}
+  ],
+  "sort": {"key": null, "dir": 1},
+  "saleMode": "perso",
+  "sales": [{"id": "sale_1", "productId": "prod_1", "name": "Lampe Test M", "price": 54, "cost": 30, "margin": 24, "platformId": "plat_etsy", "platformName": "Etsy", "date": "2026-10-20T10:00:00.000Z", "source": "manual"}],
+  "savedAt": "2026-10-31T10:00:00.000Z"
+}
