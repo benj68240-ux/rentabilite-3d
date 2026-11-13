@@ -159,6 +159,8 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
 .toast.on { opacity: 1; }
 .toast button { pointer-events: auto; margin-left: 10px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 input.invalide, .champs input.invalide, .extra input.invalide, .remise input.invalide { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-bg); }
+.plat-row .p-perso { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--soft); margin-top: -2px; }
+.plat-row .p-perso input { width: auto; margin: 0; accent-color: var(--accent); }
 .bandeau-perso { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange); padding: 10px 14px; border-radius: 10px; margin: 0 0 12px; font-size: 13.5px; font-weight: 600; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (max-width: 760px) {
@@ -190,16 +192,12 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
 <div class="app">
   <header class="top">
     <div class="brand">L'Atelier Baradel <small>Rentabilité de tes créations imprimées en 3D</small></div>
-    <div class="badges"><span class="badge perso visually-hidden" id="badgePerso">Mode vente directe</span></div>
+    
   </header>
   <div id="storageWarning" class="storage-warning visually-hidden" role="alert">
     ⚠️ La sauvegarde automatique ne fonctionne pas sur ce navigateur/appareil : tes modifications ne seront <strong>pas</strong> conservées après fermeture. Utilise « Exporter (JSON) » (onglet Réglages) avant de quitter.
   </div>
   <div id="driveStatus" class="drive-status visually-hidden"></div>
-  <div id="persoBanner" class="bandeau-perso visually-hidden" role="status">
-    <span>Mode « vente directe (perso) » actif sur TOUS les produits : frais de plateforme et URSSAF ignorés, ventes non comptabilisées.</span>
-    <button class="btn" data-action="saleMode" data-mode="pro">Repasser en vente pro</button>
-  </div>
 
   <nav class="tabs" id="tabs">
     <button data-tab="bord">📊 Tableau de bord</button>
@@ -272,10 +270,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
         <div><label for="s_failureRate">Échecs d'impression (%)</label><input type="text" inputmode="decimal" id="s_failureRate" data-setting="failureRate"></div>
       </div></div>
       <div class="card large"><h3>🛒 Plateformes de vente (frais)</h3><div id="platformsList"></div><button class="btn" id="btnAddPlatform">+ Ajouter une plateforme</button>
-        <p class="soft" style="margin:8px 0 0">Une plateforme dont le nom commence par « Site » sert au calcul « marge si vendu sur le site ».</p></div>
-      <div class="card"><h3>🧮 Mode de vente</h3>
-        <div class="outils" role="group" aria-label="Mode de vente"><button class="btn" data-sale-mode="pro">Vente pro (Etsy / site)</button><button class="btn" data-sale-mode="perso">Vente directe (perso)</button></div>
-        <p class="soft" id="saleModeHint" style="margin:0"></p></div>
+        <p class="soft" style="margin:8px 0 0">Chaque produit est vendu sur UN de ces choix (fiche produit, « Combien il te rapporte »). « Vente perso » coché : ni frais ni URSSAF, ventes non comptabilisées. Une plateforme dont le nom commence par « Site » sert au calcul « marge si vendu sur le site ».</p></div>
       <div class="card"><h3>☁ Sauvegarde</h3>
         <div class="outils"><button class="btn" id="btnDriveConnect">☁ Connecter Google Drive</button><button class="btn visually-hidden" id="btnDriveSyncNow">🔄 Synchroniser maintenant</button></div>
         <div class="outils"><button class="btn" id="btnExportJson">⬇ Exporter (JSON)</button><button class="btn" id="btnImportJson">⬆ Importer (JSON)</button></div>
@@ -383,6 +378,19 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     // Passage unique de l'ancienne base fixe (2 €) à 1,5 € ; ensuite les valeurs saisies sont conservées.
     var migratePackaging = s.packagingBase !== WORKSHOP_PACKAGING;
     s.packagingBase = WORKSHOP_PACKAGING;
+    // Vente perso = un choix de vente comme Etsy ou le site, produit par produit ; plus de mode
+    // global (Benjamin, 13/11/2026). Passage unique : « Vente directe » devient ce choix.
+    if (s.settings && Array.isArray(s.settings.platforms) && s.persoBase !== "1") {
+      var perso = s.settings.platforms.filter(function (pl) { return /^vente\s+(directe|perso)/i.test(String(pl.name || "").trim()); })[0];
+      if (!perso) {
+        perso = { id: uid("plat"), name: "Vente perso", percent: "0", fixed: "0" };
+        s.settings.platforms.push(perso);
+      }
+      perso.perso = true;
+      perso.name = "Vente perso";
+      s.persoBase = "1";
+    }
+    s.saleMode = "pro";
     // Passage unique : main d'œuvre à 0 -> 10 min ; ensuite un 0 saisi volontairement est conservé.
     var migrateLabor = s.laborBase !== WORKSHOP_LABOR;
     s.laborBase = WORKSHOP_LABOR;
@@ -417,7 +425,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
         targetMargin: "30",
         platforms: [
           { id: etsyId, name: "Etsy", percent: "10", fixed: "0,30" },
-          { id: directId, name: "Vente directe", percent: "0", fixed: "0" }
+          { id: directId, name: "Vente perso", percent: "0", fixed: "0", perso: true }
         ]
       },
       products: [
@@ -437,7 +445,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       salesPanelOpen: false,
       socialRateBase: WORKSHOP_SOCIAL_RATE,
       packagingBase: WORKSHOP_PACKAGING,
-      laborBase: WORKSHOP_LABOR
+      laborBase: WORKSHOP_LABOR,
+      persoBase: "1"
     };
   }
 
@@ -1091,9 +1100,9 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     var amortization = printerLifetime > 0 ? parseNum(s.printerPrice) / printerLifetime : 0;
     var energyCost = totalPrintTime * ((parseNum(s.printerPower) / 1000) * parseNum(s.kwhPrice) + amortization) * failureMult;
 
-    var isPerso = state.saleMode === "perso";
-
     var platform = findPlatform(p.platformId) || { percent: 0, fixed: 0 };
+    // Vente perso : choix de vente sans commission ni cotisations URSSAF.
+    var isPerso = !!platform.perso;
     var platformPercent = isPerso ? 0 : parseNum(platform.percent);
     var platformFixed = isPerso ? 0 : parseNum(platform.fixed);
     var platformCost = feeBase * platformPercent / 100 + platformFixed;
@@ -1122,8 +1131,10 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     var site = findSitePlatform();
     var siteMargin = null, siteMarginPercent = null;
     if (site) {
-      var siteFees = isPerso ? 0 : feeBase * parseNum(site.percent) / 100 + parseNum(site.fixed);
-      siteMargin = price - (totalCost - platformCost + siteFees);
+      // Toujours calculée comme une vente pro sur le site, même si la ligne est en vente perso.
+      var siteFees = site.perso ? 0 : feeBase * parseNum(site.percent) / 100 + parseNum(site.fixed);
+      var siteSocial = site.perso ? 0 : feeBase * parseNum(s.socialChargeRate) / 100;
+      siteMargin = price - (totalCost - platformCost - socialCost + siteFees + siteSocial);
       siteMarginPercent = price > 0 ? (siteMargin / price * 100) : null;
     }
     var marginPerHour = totalPrintTime > 0 ? (netMargin / totalPrintTime) : null;
@@ -1148,7 +1159,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       socialCost: socialCost, laborCost: laborCost, totalCost: totalCost,
       // Part des coûts proportionnelle au prix (commission % + cotisations) : baisse avec une réduction.
       priceLinkedCost: price * (platformPercent + socialRate) / 100,
-      shipping: shipping, shippingFees: shippingFees,
+      shipping: shipping, shippingFees: shippingFees, isPerso: isPerso,
       materialCostPercent: materialCostPercent, energyCostPercent: energyCostPercent,
       platformCostPercent: platformCostPercent, socialCostPercent: socialCostPercent,
       laborCostPercent: laborCostPercent,
@@ -1287,7 +1298,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
         .sort(function (a, b) { return b.g - a.g; });
       gainEl.innerHTML = '<p class="soft" style="margin:0 0 6px">Sur une vente de chaque produit : <b>' + formatCurrency(tot.site) + "</b> de marge sur le site contre <b>" +
         formatCurrency(tot.margin) + "</b> avec la plateforme actuelle de chaque produit." +
-        (state.saleMode === "perso" ? " (Mode vente directe : aucun frais, donc aucun écart.)" : "") + "</p>" +
+"</p>" +
         gains.slice(0, 4).map(function (x) {
           return '<div class="ligne-simple"><button class="lien" data-open="' + x.p.id + '">' + escapeHtml(x.p.name) + "</button>" + pill((x.g >= 0 ? "+" : "") + formatCurrency(x.g), x.g >= 0 ? "green" : "red") + "</div>";
         }).join("");
@@ -1602,36 +1613,32 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     if (ac) ac.textContent = "· " + formatPercent(c.accessoriesPercent) + " du coût";
 
     var plats = state.settings.platforms.map(function (pl) { return { pl: pl, c: computeWith(p, { platformId: pl.id }) }; });
-    var best = plats.reduce(function (a, b) { return b.c.netMargin > a.c.netMargin + 1e-9 ? b : a; }, plats[0]);
-    // Pas de 🏆 en cas d'égalité (ex. mode vente directe : toutes les colonnes rapportent pareil).
-    if (plats.filter(function (x) { return Math.abs(x.c.netMargin - best.c.netMargin) < 0.005; }).length > 1) best = null;
+    // 🏆 parmi les ventes pro seulement (la vente perso, sans frais ni URSSAF, gagnerait toujours) ; pas de 🏆 en cas d'égalité.
+    var pros = plats.filter(function (x) { return !x.pl.perso; });
+    var best = pros.length > 1 ? pros.reduce(function (a, b) { return b.c.netMargin > a.c.netMargin + 1e-9 ? b : a; }, pros[0]) : null;
+    if (best && pros.filter(function (x) { return Math.abs(x.c.netMargin - best.c.netMargin) < 0.005; }).length > 1) best = null;
     var price = nonNeg(p.price);
     var lo = price > 0 ? Math.max(1, Math.floor(price * 0.6)) : 0, hi = price > 0 ? Math.ceil(price * 1.5) : 100;
     document.getElementById("ficheDyn").innerHTML =
-      // Mode de vente modifiable ici aussi (Benjamin, 11/11/2026, option A) : même réglage que l'onglet Réglages.
       '<div class="card"><h3>Combien il te rapporte</h3>' +
-      '<div class="outils" role="group" aria-label="Mode de vente"><span class="soft">Mode (tous les produits) :</span>' +
-        '<button class="btn' + (state.saleMode !== "perso" ? " on" : "") + '" data-action="saleMode" data-mode="pro">Vente pro</button>' +
-        '<button class="btn' + (state.saleMode === "perso" ? " on" : "") + '" data-action="saleMode" data-mode="perso">Vente directe (perso)</button></div>' +
       '<div class="compare">' + plats.map(function (x) {
         var cur = x.pl.id === p.platformId;
         return '<button type="button" class="plat' + (cur ? " choisie" : "") + '" data-action="setPlatform" data-id="' + p.id + '" data-plat="' + x.pl.id + '" aria-pressed="' + cur + '"><h4>' +
-          (cur ? "✓ " : "") + escapeHtml(x.pl.name) + (x === best ? " 🏆" : "") + "</h4>" +
+          (cur ? "✓ " : "") + escapeHtml(x.pl.name) + (x === best ? " 🏆" : "") + "</h4>" + (x.pl.perso ? '<div class="d">sans frais ni URSSAF</div>' : "") +
           '<div class="m">' + pill(formatCurrency(x.c.netMargin), marginClass(x.c.netMarginPercent)) + "</div>" +
           '<div class="d">' + pct0(x.c.netMarginPercent) + " · frais " + formatCurrency(x.c.platformCost) + "<br>prix min. " + formatCurrency(x.c.minPrice) +
           "<br>" + formatCurrency(x.c.marginPerHour) + "/h machine</div></button>";
-      }).join("") + '</div><p class="soft" style="margin:8px 0 0">Touche une colonne pour choisir où ce produit est vendu (cadre vert). 🏆 = celle qui rapporte le plus.</p>' + (state.saleMode === "perso" ? '<p class="note">Mode vente directe : frais de plateforme et URSSAF ignorés sur tous les produits.</p>' : "") + "</div>" +
+      }).join("") + '</div><p class="soft" style="margin:8px 0 0">Touche une colonne pour choisir comment CE produit est vendu (cadre vert). 🏆 = la vente pro qui rapporte le plus.</p>' + (c.isPerso ? '<p class="note">Vente perso : ni frais de plateforme ni URSSAF pour ce produit, et ses ventes ne sont pas comptabilisées.</p>' : "") + "</div>" +
       '<div class="card"><h3>Où part l\'argent (vente ' + escapeHtml(platformLabel(p)) + " à " + formatCurrency(price) + ")</h3>" + depensesHtml(p, c) +
         '<p class="soft" style="margin:10px 0 0">Prix min. pour ' + formatNumberPlain(parseNum(state.settings.targetMargin), 0) + " % de marge : <b>" + formatCurrency(c.minPrice) + "</b>" +
         (c.suggestedPrice !== null ? " · prix conseillé : <b>" + formatCurrency(c.suggestedPrice) + "</b>" : "") + "</p>" +
         (c.shipping > 0 ? '<p class="note">Port ' + formatCurrency(c.shipping) + " payé par l'acheteur : hors marge. L'acheteur paie " + formatCurrency(price + c.shipping) +
-          (state.saleMode === "perso" ? "." : " ; la commission et l'URSSAF sont calculées sur ce total (dont " + formatCurrency(c.shippingFees) + " prélevés sur le port).") + "</p>" : "") + "</div>" +
+          (c.isPerso ? "." : " ; la commission et l'URSSAF sont calculées sur ce total (dont " + formatCurrency(c.shippingFees) + " prélevés sur le port).") + "</p>" : "") + "</div>" +
       '<div class="card simu"><h3>Et si je change le prix ?</h3><input type="range" id="simu" aria-label="Prix simulé" min="' + lo + '" max="' + hi + '" step="0.1" value="' + Math.min(hi, Math.max(lo, price)) + '">' +
         '<div class="vendu"><div id="simuRes" class="soft" style="flex:1 1 220px"></div><button class="btn" data-action="useSimu" data-id="' + p.id + '">Utiliser ce prix</button></div></div>';
     updateSimu();
-    var soldBtn = document.querySelector('#fiche [data-action="sold"]'), soldNote = document.getElementById("soldNote");
-    if (soldBtn) soldBtn.disabled = state.saleMode === "perso";
-    if (soldNote) soldNote.textContent = state.saleMode === "perso" ? "Mode vente directe (perso) : les ventes ne sont pas comptabilisées. Repasse en vente pro pour enregistrer une vente." : "";
+    var soldNote = document.getElementById("soldNote");
+    if (soldNote) soldNote.textContent = "Une vente enregistrée « sur Vente perso » n'est pas comptabilisée.";
   }
 
   function updateSimu() {
@@ -1712,14 +1719,6 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       renderFicheDyn();
       scheduleBackgroundRender();
       toast("Vendu sur : " + findPlatform(platId).name);
-    } else if (action === "saleMode") {
-      var mode = btn.getAttribute("data-mode") === "perso" ? "perso" : "pro";
-      if (state.saleMode === mode) return;
-      state.saleMode = mode;
-      saveState();
-      applySaleModeUi();
-      renderBody();
-      toast(mode === "perso" ? "Mode vente directe (perso) : sans frais ni URSSAF" : "Mode vente pro : frais et URSSAF comptés");
     } else if (action === "applyMin") {
       var minProd = prodById(id);
       if (!minProd) return;
@@ -1742,7 +1741,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       var soldProd = prodById(id);
       if (!soldProd) return;
       // Les ventes perso ne sont pas comptabilisées (Benjamin, 13/11/2026).
-      if (state.saleMode === "perso") { toast("Mode vente directe (perso) : vente non comptabilisée"); return; }
+
       // Double appui : une seule vente.
       if (Date.now() - lastSoldAt < 1500) return;
       lastSoldAt = Date.now();
@@ -1750,6 +1749,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       var soldPlatformId = sp && sp.value ? sp.value : soldProd.platformId;
       var c = computeWith(soldProd, { platformId: soldPlatformId });
       var platform = findPlatform(soldPlatformId);
+      // Les ventes perso ne sont pas comptabilisées (Benjamin, 13/11/2026).
+      if (platform && platform.perso) { toast("Vente perso : non comptabilisée"); return; }
       var saleId = uid("sale");
       state.sales.push({
         id: saleId,
@@ -1882,7 +1883,6 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     });
     updateAmortDisplay();
     renderPlatformsSettings();
-    applySaleModeUi();
   }
 
   function renderPlatformsSettings() {
@@ -1893,7 +1893,8 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
         '<div class="p-nom"><label>Nom</label><input type="text" data-plat-field="name" data-plat-id="' + pl.id + '" value="' + escapeHtml(pl.name) + '"></div>' +
         '<div><label>% sur vente</label><input type="text" inputmode="decimal" data-plat-field="percent" data-plat-id="' + pl.id + '" value="' + escapeHtml(pl.percent) + '"></div>' +
         '<div><label>Fixe (€)</label><input type="text" inputmode="decimal" data-plat-field="fixed" data-plat-id="' + pl.id + '" value="' + escapeHtml(pl.fixed) + '"></div>' +
-        '<div><button class="btn danger" data-remove-platform="' + pl.id + '"' + (canRemove ? "" : " disabled") + ' title="Supprimer cette plateforme">✕</button></div></div>';
+        '<div><button class="btn danger" data-remove-platform="' + pl.id + '"' + (canRemove ? "" : " disabled") + ' title="Supprimer cette plateforme">✕</button></div>' +
+        '<label class="p-perso"><input type="checkbox" data-plat-perso="' + pl.id + '"' + (pl.perso ? " checked" : "") + "> Vente perso (ni frais ni URSSAF, ventes non comptabilisées)</label></div>";
     }).join("");
   }
 
@@ -1906,6 +1907,15 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     saveState();
     renderBody();
     renderSales();
+  });
+  document.getElementById("platformsList").addEventListener("change", function (e) {
+    var box = e.target.closest("[data-plat-perso]"); if (!box) return;
+    var pl = state.settings.platforms.filter(function (x) { return x.id === box.getAttribute("data-plat-perso"); })[0];
+    if (!pl) return;
+    if (box.checked) pl.perso = true; else delete pl.perso;
+    saveState();
+    renderBody();
+    if (ficheId) renderFicheDyn();
   });
   document.getElementById("platformsList").addEventListener("click", function (e) {
     var btn = e.target.closest("[data-remove-platform]"); if (!btn) return;
@@ -1933,27 +1943,6 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
       markValidity(input);
       saveState();
       updateAmortDisplay();
-      renderBody();
-    });
-  });
-
-  // Mode de vente global : Pro (commission + cotisations) vs Perso (aucune charge)
-  function applySaleModeUi() {
-    var mode = state.saleMode;
-    document.querySelectorAll("[data-sale-mode]").forEach(function (btn) {
-      btn.classList.toggle("on", btn.getAttribute("data-sale-mode") === mode);
-    });
-    document.getElementById("saleModeHint").textContent = mode === "perso"
-      ? "Mode « Vente directe perso » : la commission de plateforme et les cotisations URSSAF sont ignorées sur tous les produits."
-      : "Mode « Vente pro » : la commission (selon la plateforme de chaque produit) et les cotisations URSSAF micro-entreprise s'appliquent.";
-    document.getElementById("badgePerso").classList.toggle("visually-hidden", mode !== "perso");
-    document.getElementById("persoBanner").classList.toggle("visually-hidden", mode !== "perso");
-  }
-  document.querySelectorAll("[data-sale-mode]").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      state.saleMode = btn.getAttribute("data-sale-mode");
-      saveState();
-      applySaleModeUi();
       renderBody();
     });
   });

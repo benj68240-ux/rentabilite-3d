@@ -6,8 +6,8 @@ const assert = require('assert/strict');
 const html = fs.readFileSync(process.env.RENTA_HTML || __dirname + '/index.html', 'utf8');
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 const data = JSON.parse(fs.readFileSync(process.argv[2] || __dirname + '/tests/donnees_exemple.json', 'utf8').replace(/^﻿/, ''));
-// Contrôles faits en mode « vente pro » (frais + URSSAF), même si le fichier a été laissé en mode perso.
-data.saleMode = 'pro';
+const persoPl = data.settings.platforms.find(p => /^vente (directe|perso)/i.test(p.name));
+persoPl.perso = true;
 data.products.forEach(p => { if (p.shipping === undefined || p.shipping === '') p.shipping = '5'; });
 const make = state => {
   const ctx = vm.createContext({ Math, String, isNaN, parseFloat, state });
@@ -44,21 +44,20 @@ for (const p of data.products) {
   }
   assert.equal(c.belowMin, pr < c.minPrice - 0.005, p.name);
 }
-// Mode perso : ni commission ni URSSAF, port sans effet.
-data.saleMode = 'perso';
-for (const p of data.products) {
-  const c = ctx.computeRow(p);
+// Vente perso (choix par produit) : ni commission ni URSSAF, port sans effet ; la marge site reste une vente pro.
+for (const p0 of data.products) {
+  const p = Object.assign({}, p0, { platformId: persoPl.id }), c = ctx.computeRow(p);
   assert.equal(c.platformCost, 0); assert.equal(c.socialCost, 0);
   near(c.netMargin, ctx.computeRow(Object.assign({}, p, { shipping: '0' })).netMargin, p.name + ' perso');
+  near(c.siteMargin, ctx.computeRow(Object.assign({}, p0, { platformId: site.id })).netMargin, p.name + ' marge site depuis perso');
 }
-data.saleMode = 'pro';
 // Échecs d'impression : pas de majoration sur les pièces achetées (options).
 const opt = data.products.find(p => (p.extras || []).length);
 if (opt) near(ctx.computeRow(opt).totalCost - ctx.computeRow(Object.assign({}, opt, { extras: [] })).totalCost, ctx.parseNum(opt.extras[0].cost), 'coût pièce sans majoration');
 // Saisie négative : comptée comme 0.
 near(ctx.computeRow(Object.assign({}, data.products[0], { weight: '-50' })).materialCost, 0, 'poids négatif');
 // Sans profil « Site » : pas de marge site.
-const sansSite = make({ saleMode: 'pro', settings: Object.assign({}, data.settings, { platforms: data.settings.platforms.filter(p => p !== site) }) });
+const sansSite = make({ settings: Object.assign({}, data.settings, { platforms: data.settings.platforms.filter(p => p !== site) }) });
 assert.equal(sansSite.computeRow(data.products[0]).siteMargin, null);
 for (const [m, attendu] of [[10.25, 10.9], [10.9, 10.9], [10.91, 11.9], [7, 7.9]]) {
   let s = Math.floor(m) + 0.9; if (s < m - 1e-9) s += 1;
