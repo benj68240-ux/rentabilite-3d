@@ -1619,7 +1619,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
   // « Où part l'argent » (Benjamin, 11/11/2026) : barres horizontales rangées de la dépense
   // la plus chère à la moins chère, total, puis la marge à part en vert (camembert refusé).
   function depensesHtml(p, c) {
-    var price = nonNeg(p.price);
+    var price = c.price;
     var options = c.totalCost - c.materialCost - c.energyCost - c.platformCost - c.socialCost - c.laborCost - nonNeg(p.packaging) - nonNeg(p.accessories);
     var parts = [
       ["Matière", c.materialCost], ["Machine", c.energyCost], ["Frais " + platformLabel(p), c.platformCost],
@@ -1638,42 +1638,53 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
 
   // Options vendues en plus (ex. Suspension à 8 € sur une lampe) : ce que chacune rapporte en plus,
   // et case à cocher pour l'inclure dans la prochaine vente enregistrée avec « ✓ Vendu ».
+  // Options vendues cochées dans la fiche : tous les calculs de la fiche les incluent aussitôt.
+  function selectedOptionIds(p) {
+    return (p.extras || []).filter(function (ex) { return isSoldOption(ex) && soldOptionIds.has(ex.id); }).map(function (ex) { return ex.id; });
+  }
+
   function soldOptionsHtml(p, c) {
     var opts = (p.extras || []).filter(isSoldOption);
     if (!opts.length) return "";
+    var sel = selectedOptionIds(p);
     var all = computeWith(p, { withOptions: "all" });
     return '<div class="card"><h3>Options vendues en plus (vente ' + escapeHtml(platformLabel(p)) + ")</h3>" + opts.map(function (ex) {
-      var prix = nonNeg(ex.price), gain = computeWith(p, { withOptions: [ex.id] }).netMargin - c.netMargin;
+      var prix = nonNeg(ex.price),
+        without = sel.filter(function (id) { return id !== ex.id; }), withIt = without.concat([ex.id]),
+        gain = computeWith(p, { withOptions: withIt }).netMargin - computeWith(p, { withOptions: without }).netMargin;
       return '<div class="ligne-simple"><label style="display:flex;gap:8px;align-items:center;min-width:0"><input type="checkbox" data-sold-option="' + ex.id + '"' +
         (soldOptionIds.has(ex.id) ? " checked" : "") + ' style="width:18px;height:18px;margin:0;accent-color:var(--accent)"><span>' + escapeHtml(ex.name || "Option") +
         ' <span class="soft">+' + formatCurrency(prix) + "</span></span></label>" +
         pill((gain >= 0 ? "+" : "") + formatCurrency(gain) + " de marge", marginClass(gain / prix * 100)) + "</div>";
     }).join("") +
       '<p class="soft" style="margin:8px 0 0">' + (opts.length > 1 ? "Avec toutes les options" : "Avec l'option") + " : vendu <b>" + formatCurrency(all.price) + "</b>, marge <b>" +
-      formatCurrency(all.netMargin) + "</b> (" + pct0(all.netMarginPercent) + "). Coche une option pour l'inclure dans la vente enregistrée avec « ✓ Vendu ».</p></div>";
+      formatCurrency(all.netMargin) + "</b> (" + pct0(all.netMarginPercent) + "). Coche une option : les colonnes, « Où part l\'argent » et la simulation se recalculent tout de suite, et elle est incluse dans la vente enregistrée avec « ✓ Vendu ».</p></div>";
   }
 
   function renderFicheDyn() {
     var p = prodById(ficheId);
     if (!p || !document.getElementById("ficheDyn")) return;
-    var c = computeRow(p);
-    document.getElementById("ficheAlert").innerHTML = c.belowMin && c.suggestedPrice !== null
-      ? '<div class="card" style="border-color:var(--red)"><b style="color:var(--red)">⚠ Sous le prix minimum ' + escapeHtml(platformLabel(p)) + " (" + formatCurrency(c.minPrice) + ")</b> " +
-        '<button class="btn alerte" style="margin-left:6px" data-action="applyMin" data-id="' + p.id + '">Passer à ' + formatCurrency(c.suggestedPrice) + "</button></div>"
+    // pv = le produit avec les options cochées : c'est lui qui alimente toute la fiche.
+    var pv = Object.assign({}, p, { withOptions: selectedOptionIds(p) });
+    var c = computeRow(pv), c0 = computeRow(p);
+    // L'alerte « sous le minimum » concerne le prix enregistré du produit seul.
+    document.getElementById("ficheAlert").innerHTML = c0.belowMin && c0.suggestedPrice !== null
+      ? '<div class="card" style="border-color:var(--red)"><b style="color:var(--red)">⚠ Sous le prix minimum ' + escapeHtml(platformLabel(p)) + " (" + formatCurrency(c0.minPrice) + ")</b> " +
+        '<button class="btn alerte" style="margin-left:6px" data-action="applyMin" data-id="' + p.id + '">Passer à ' + formatCurrency(c0.suggestedPrice) + "</button></div>"
       : "";
     var pk = document.getElementById("pct_packaging"), ac = document.getElementById("pct_accessories");
     if (pk) pk.textContent = "· " + formatPercent(c.packagingPercent) + " du coût";
     if (ac) ac.textContent = "· " + formatPercent(c.accessoriesPercent) + " du coût";
 
-    var plats = state.settings.platforms.map(function (pl) { return { pl: pl, c: computeWith(p, { platformId: pl.id }) }; });
+    var plats = state.settings.platforms.map(function (pl) { return { pl: pl, c: computeWith(pv, { platformId: pl.id }) }; });
     // 🏆 parmi les ventes pro seulement (la vente perso, sans frais ni URSSAF, gagnerait toujours) ; pas de 🏆 en cas d'égalité.
     var pros = plats.filter(function (x) { return !x.pl.perso; });
     var best = pros.length > 1 ? pros.reduce(function (a, b) { return b.c.netMargin > a.c.netMargin + 1e-9 ? b : a; }, pros[0]) : null;
     if (best && pros.filter(function (x) { return Math.abs(x.c.netMargin - best.c.netMargin) < 0.005; }).length > 1) best = null;
-    var price = nonNeg(p.price);
+    var price = nonNeg(p.price), shown = c.price, avecOptions = pv.withOptions.length > 0;
     var lo = price > 0 ? Math.max(1, Math.floor(price * 0.6)) : 0, hi = price > 0 ? Math.ceil(price * 1.5) : 100;
     document.getElementById("ficheDyn").innerHTML =
-      '<div class="card"><h3>Combien il te rapporte</h3>' +
+      '<div class="card"><h3>Combien il te rapporte' + (avecOptions ? ' <span class="soft">(avec option : ' + formatCurrency(shown) + ")</span>" : "") + "</h3>" +
       '<div class="compare">' + plats.map(function (x) {
         var cur = x.pl.id === p.platformId;
         return '<button type="button" class="plat' + (cur ? " choisie" : "") + '" data-action="setPlatform" data-id="' + p.id + '" data-plat="' + x.pl.id + '" aria-pressed="' + cur + '"><h4>' +
@@ -1682,10 +1693,10 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
           '<div class="d">' + pct0(x.c.netMarginPercent) + " · frais " + formatCurrency(x.c.platformCost) + "<br>prix min. " + formatCurrency(x.c.minPrice) +
           "<br>" + formatCurrency(x.c.marginPerHour) + "/h machine</div></button>";
       }).join("") + '</div><p class="soft" style="margin:8px 0 0">Touche une colonne pour choisir comment CE produit est vendu (cadre vert). 🏆 = la vente pro qui rapporte le plus.</p>' + (c.isPerso ? '<p class="note">Vente perso : ni frais de plateforme ni URSSAF pour ce produit, et ses ventes ne sont pas comptabilisées.</p>' : "") + "</div>" +
-      '<div class="card"><h3>Où part l\'argent (vente ' + escapeHtml(platformLabel(p)) + " à " + formatCurrency(price) + ")</h3>" + depensesHtml(p, c) +
+      '<div class="card"><h3>Où part l\'argent (vente ' + escapeHtml(platformLabel(p)) + " à " + formatCurrency(shown) + (avecOptions ? ", options comprises" : "") + ")</h3>" + depensesHtml(pv, c) +
         '<p class="soft" style="margin:10px 0 0">Prix min. pour ' + formatNumberPlain(parseNum(state.settings.targetMargin), 0) + " % de marge : <b>" + formatCurrency(c.minPrice) + "</b>" +
-        (c.suggestedPrice !== null ? " · prix conseillé : <b>" + formatCurrency(c.suggestedPrice) + "</b>" : "") + "</p>" +
-        (c.shipping > 0 ? '<p class="note">Port ' + formatCurrency(c.shipping) + " payé par l'acheteur : hors marge. L'acheteur paie " + formatCurrency(price + c.shipping) +
+        (c.suggestedPrice !== null ? " · prix conseillé : <b>" + formatCurrency(c.suggestedPrice) + "</b>" : "") + (avecOptions ? " (total avec options)" : "") + "</p>" +
+        (c.shipping > 0 ? '<p class="note">Port ' + formatCurrency(c.shipping) + " payé par l'acheteur : hors marge. L'acheteur paie " + formatCurrency(shown + c.shipping) +
           (c.isPerso ? "." : " ; la commission et l'URSSAF sont calculées sur ce total (dont " + formatCurrency(c.shippingFees) + " prélevés sur le port).") + "</p>" : "") + "</div>" +
       soldOptionsHtml(p, c) +
       '<div class="card simu"><h3>Et si je change le prix ?</h3><input type="range" id="simu" aria-label="Prix simulé" min="' + lo + '" max="' + hi + '" step="0.1" value="' + Math.min(hi, Math.max(lo, price)) + '">' +
@@ -1700,10 +1711,10 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     if (!p || !r) return;
     var P = parseFloat(r.value);
     var parts = state.settings.platforms.map(function (pl) {
-      var c = computeWith(p, { price: String(P), platformId: pl.id });
+      var c = computeWith(p, { price: String(P), platformId: pl.id, withOptions: selectedOptionIds(p) });
       return escapeHtml(pl.name) + " " + pill(formatCurrency(c.netMargin), marginClass(c.netMarginPercent));
     });
-    document.getElementById("simuRes").innerHTML = "À <b>" + formatCurrency(P) + "</b> : " + parts.join(" · ");
+    document.getElementById("simuRes").innerHTML = "À <b>" + formatCurrency(P) + "</b>" + (selectedOptionIds(p).length ? " + options" : "") + " : " + parts.join(" · ");
   }
 
   function markValidity(input) {
@@ -1735,6 +1746,7 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
     var t = e.target, p = prodById(ficheId); if (!p) return;
     if (t.matches("[data-sold-option]")) {
       if (t.checked) soldOptionIds.add(t.getAttribute("data-sold-option")); else soldOptionIds.delete(t.getAttribute("data-sold-option"));
+      renderFicheDyn();
     } else if (t.matches("input.titre")) {
       // Nom validé : la catégorie et le choix d'embase (lampes) suivent le nouveau nom.
       renderFiche();
