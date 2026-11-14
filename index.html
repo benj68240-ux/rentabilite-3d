@@ -359,8 +359,9 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
   var WORKSHOP_PACKAGING = "1.5";
   // Cotisations URSSAF micro-entreprise vente BIC : 12,3 % + 1 % versement libératoire + 0,1 % CFP (Benjamin, 01/11/2026).
   var WORKSHOP_SOCIAL_RATE = "13,4";
-  // Main d'œuvre : 10 min d'emballage par défaut ; passage unique des produits restés à 0 (Benjamin, 13/11/2026).
-  var WORKSHOP_LABOR = "10";
+  // Main d'œuvre : 0 min par défaut. Les 10 min d'emballage ajoutées d'office le 13/11/2026 sont
+  // retirées (Benjamin, 14/11/2026) : passage unique des produits à 10 min -> 0.
+  var WORKSHOP_LABOR = "0";
   // Frais de port : 5 € par défaut, payés par l'acheteur (hors marge) mais comptés dans la base
   // URSSAF et dans la commission de la plateforme (Benjamin, 13/11/2026).
   var WORKSHOP_SHIPPING = "5";
@@ -411,15 +412,15 @@ input.invalide, .champs input.invalide, .extra input.invalide, .remise input.inv
         });
       }
     }
-    // Passage unique : main d'œuvre à 0 -> 10 min ; ensuite un 0 saisi volontairement est conservé.
-    var migrateLabor = s.laborBase !== WORKSHOP_LABOR;
+    // Passage unique : on retire les 10 min posées d'office par l'ancienne règle (laborBase "10").
+    var revertLabor = s.laborBase === "10";
     s.laborBase = WORKSHOP_LABOR;
     s.products.forEach(function (p) {
       p.filamentPrice = WORKSHOP_FILAMENT_PRICE;
       if (isBlank(p.packaging) || (migratePackaging && String(p.packaging).trim() === "2")) {
         p.packaging = WORKSHOP_PACKAGING;
       }
-      if (migrateLabor && parseNum(p.laborTime) === 0) p.laborTime = WORKSHOP_LABOR;
+      if ((revertLabor && parseNum(p.laborTime) === 10) || isBlank(p.laborTime)) p.laborTime = WORKSHOP_LABOR;
       if (isBlank(p.shipping)) p.shipping = WORKSHOP_SHIPPING;
       // Résidu d'arrondi laissé par un ancien changement d'embase (ex. 24.299999999999997 g).
       if (typeof p.weight === "string" && /\.\d{7,}$/.test(p.weight)) p.weight = String(roundTo(parseNum(p.weight), 2));
