@@ -51,6 +51,20 @@ for (const p0 of data.products) {
   near(c.netMargin, ctx.computeRow(Object.assign({}, p, { shipping: '0' })).netMargin, p.name + ' perso');
   near(c.siteMargin, ctx.computeRow(Object.assign({}, p0, { platformId: site.id })).netMargin, p.name + ' marge site depuis perso');
 }
+// Option vendue en plus : absente du calcul du produit seul ; avec l'option, le prix et les coûts s'ajoutent.
+{
+  const base = data.products[0], pl = data.settings.platforms.find(x => x.id === base.platformId);
+  const avec = Object.assign({}, base, { extras: [{ id: 'o1', name: 'Suspension', weight: '58', time: '2', cost: '0.5', price: '8' }] });
+  const c0 = ctx.computeRow(base), c1 = ctx.computeRow(avec), c2 = ctx.computeRow(Object.assign({}, avec, { withOptions: ['o1'] }));
+  near(c1.netMargin, c0.netMargin, 'option non comptée dans le produit seul');
+  near(c1.minPrice, c0.minPrice, 'prix min inchangé');
+  near(c2.price, ctx.parseNum(base.price) + 8, 'prix avec option');
+  const fail = 1 + ctx.parseNum(data.settings.failureRate) / 100, st = data.settings;
+  const coutOption = 0.058 * ctx.parseNum(base.filamentPrice) * fail + 2 * (ctx.parseNum(st.printerPower) / 1000 * ctx.parseNum(st.kwhPrice) + ctx.parseNum(st.printerPrice) / ctx.parseNum(st.printerLifetime)) * fail + 0.5
+    + 8 * (ctx.parseNum(pl.percent) / 100 + rate);
+  near(c2.netMargin - c0.netMargin, 8 - coutOption, 'marge de l\'option');
+  near(ctx.computeRow(Object.assign({}, avec, { withOptions: 'all' })).netMargin, c2.netMargin, 'toutes les options');
+}
 // Échecs d'impression : pas de majoration sur les pièces achetées (options).
 const opt = data.products.find(p => (p.extras || []).length);
 if (opt) near(ctx.computeRow(opt).totalCost - ctx.computeRow(Object.assign({}, opt, { extras: [] })).totalCost, ctx.parseNum(opt.extras[0].cost), 'coût pièce sans majoration');

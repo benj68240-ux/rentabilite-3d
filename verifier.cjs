@@ -42,7 +42,7 @@ for (let i = 0; i < loaded.products.length; i++) {
   assert(!/\((P1S|A1)\)$/.test(loaded.products[i].name));
 }
 assert.deepEqual(loaded.products.map(p => p.packaging), ['1.5', '1.5', '0,80', '1.5']);   // 2 € -> 1,5 € une fois
-assert.deepEqual(loaded.products.map(p => p.laborTime), ['20', '10', '10', '5']);        // 0 ou vide -> 10 min une fois
+assert.deepEqual(loaded.products.map(p => p.laborTime), ['20', '0', '0', '5']);          // main d'œuvre : plus de 10 min d'office
 assert.deepEqual(loaded.products.map(p => p.shipping), ['5', '5', '5', '0']);            // port 5 € par défaut, 0 saisi conservé
 assert.equal(loaded.products[3].weight, '24.3');                                          // résidu d'arrondi nettoyé
 assert.deepEqual(loaded.sales, source.sales);
@@ -53,22 +53,23 @@ assert.deepEqual(context.normalizeImported(fixture()).products, loaded.products)
 api.state = loaded;
 api.state.products[0].filamentPrice = '99';
 api.state.products[0].packaging = '2';
-api.state.products[1].laborTime = '0';
+api.state.products[1].laborTime = '10';
 api.state.products[1].shipping = '0';
 api.state.settings.socialChargeRate = '14';
 context.saveState();
 const reloaded = context.loadState();
 assert.equal(reloaded.products[0].filamentPrice, '15');
 assert.equal(reloaded.products[0].packaging, '2');
-assert.equal(reloaded.products[1].laborTime, '0');
+assert.equal(reloaded.products[1].laborTime, '10');                                       // 10 min saisies à la main : conservées
 assert.equal(reloaded.products[1].shipping, '0');
 assert.equal(reloaded.settings.socialChargeRate, '14');
 assert(reloaded.products[0].updatedAt && reloaded.products[1].updatedAt && !reloaded.products[2].updatedAt && reloaded.settingsAt);
 // Champ vide -> valeur par défaut.
-const vide = {products: [{name: 'X', packaging: '', shipping: ''}], packagingBase: '1.5', laborBase: '10'};
+const vide = {products: [{name: 'X', packaging: '', shipping: ''}, {name: 'Y', laborTime: '10'}, {name: 'Z', laborTime: '20'}], packagingBase: '1.5', laborBase: '10'};
 context.applyWorkshopProductRules(vide, true);
 assert.equal(vide.products[0].packaging, '1.5');
 assert.equal(vide.products[0].shipping, '5');
+assert.deepEqual(vide.products.map(p => p.laborTime), ['0', '0', '20']);                 // retrait unique des 10 min posées d'office
 for (const [name, expected] of [
   ['Objet (P1S)', 'Objet'], ['Objet (A1) (copie)', 'Objet (copie)'],
   ['Objet (4 couleurs)', 'Objet (4 couleurs)'], ['Modèle A1', 'Modèle A1']
@@ -83,7 +84,7 @@ const addStart = html.indexOf(marker) + marker.length;
 const addEnd = html.indexOf('    saveState();', addStart);
 vm.runInContext(html.slice(addStart, addEnd), context);
 const nouveau = api.state.products.at(-1);
-assert.deepEqual([nouveau.filamentPrice, nouveau.packaging, nouveau.laborTime, nouveau.shipping], ['15', '1.5', '10', '5']);
+assert.deepEqual([nouveau.filamentPrice, nouveau.packaging, nouveau.laborTime, nouveau.shipping], ['15', '1.5', '0', '5']);
 
 // Embase : plus d'ajout automatique, arrondi propre.
 assert(!html.includes('normalizeEmbaseTypes'));
@@ -111,10 +112,22 @@ assert.equal(context.contentKey(context.mergeStates(tel, pc)), context.contentKe
 const tel2 = save(tel, '2026-11-13T10:10:00.000Z', s => { s.products[1].price = '10'; });
 assert.equal(context.mergeStates(pc, tel2).products[1].price, '10');
 
+// Suspension : 12 € seule, 8 € en option sur les lampes Aurore (passage unique).
+const cat = {settings: {platforms: [{id: 'e', name: 'Etsy', percent: '10', fixed: '0'}]}, products: [
+  {id: 'a', name: 'Lampe Aurore S + Embase E27', price: '49', extras: []},
+  {id: 'b', name: 'Lampe Cristal', price: '31'},
+  {id: 's', name: 'Suspension', price: '8', weight: '58', printTime: '2', accessories: '0', extras: [{id: 'x', name: 'Corde', cost: '0.5'}]}]};
+context.normalizeImported(cat);
+assert.equal(cat.products[2].price, '12');
+assert.deepEqual(clone(cat.products[0].extras), [{id: 'extra_suspension_a', name: 'Suspension', weight: '58', time: '2', cost: '0.5', price: '8'}]);
+assert.equal(cat.products[1].extras, undefined);
+cat.products[2].price = '13'; cat.products[0].extras = [];
+context.normalizeImported(cat);
+assert.equal(cat.products[2].price, '13'); assert.equal(cat.products[0].extras.length, 0);   // une seule fois
 // Vente perso : un choix de vente par produit, plus de mode global.
 assert(!html.includes('data-sale-mode') && !html.includes('action === "saleMode"'));
 assert(html.includes('if (platform && platform.perso) { toast("Vente perso : non comptabilisée"); return; }'));
 assert.deepEqual(clone(base.settings.platforms.map(p => [p.name, !!p.perso])), [['Etsy', false], ['Vente perso', true], ['Site internet', false]]);
 assert.equal(base.saleMode, 'pro');
 assert(/origin !== self\.location\.origin\) return;/.test(fs.readFileSync(__dirname + '/sw.js', 'utf8')));
-console.log('OK : syntaxe, saisies, valeurs par défaut (main d\'œuvre 10 min, port 5 €), passages uniques, embase, fusion entre appareils.');
+console.log('OK : syntaxe, saisies, valeurs par défaut (port 5 €, main d\'œuvre 0), passages uniques, embase, fusion entre appareils.');
