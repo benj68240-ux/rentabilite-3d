@@ -1,53 +1,82 @@
-// Alerte « prix sous le minimum » + prix conseillé en ,90 (Benjamin, 10/11/2026).
-// Contrôle sur les 12 produits réels du Drive : mêmes produits signalés que l'analyse du 10/11,
-// et prix conseillé identique à prix_conseille.py (arrondi ,90 juste au-dessus du minimum).
+// Calcul de rentabilité : port (base URSSAF / commission), marge site, prix minimum et prix conseillé en ,90.
+// node verifier_prix_min.cjs [fichier.json]  (par défaut : tests/donnees_exemple.json)
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert/strict');
-// RENTA_HTML=v2/index.html node verifier_prix_min.cjs : même contrôle sur la version 2 (onglets).
 const html = fs.readFileSync(process.env.RENTA_HTML || __dirname + '/index.html', 'utf8');
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
-const data = JSON.parse(fs.readFileSync(process.argv[2] || 'G:/Mon Drive/rentabilite-3d-data.json', 'utf8').replace(/^\uFEFF/, ''));
-// Contrôles faits en mode « vente pro » (frais + URSSAF), même si le Drive a été laissé en mode perso.
-data.saleMode = 'pro';
-const ctx = vm.createContext({ Math, String, isNaN, parseFloat, state: data });
-vm.runInContext(cut('  function parseNum(v)', '  function formatCurrency(n)'), ctx);
-vm.runInContext('function findPlatform(id){return state.settings.platforms.filter(function(p){return p.id===id;})[0];}', ctx);
-vm.runInContext(cut('  function findSitePlatform()', '  function marginClass(percent)'), ctx);
-// Marge site (11/11/2026) : écart avec la marge de la ligne = frais de sa plateforme - frais Stripe.
+const data = JSON.parse(fs.readFileSync(process.argv[2] || __dirname + '/tests/donnees_exemple.json', 'utf8').replace(/^﻿/, ''));
+const persoPl = data.settings.platforms.find(p => /^vente (directe|perso)/i.test(p.name));
+persoPl.perso = true;
+data.products.forEach(p => { if (p.shipping === undefined || p.shipping === '') p.shipping = '5'; });
+const make = state => {
+  const ctx = vm.createContext({ Math, String, isNaN, parseFloat, state });
+  vm.runInContext(cut('  function parseNum(v)', '  function formatCurrency(n)'), ctx);
+  vm.runInContext('function findPlatform(id){return state.settings.platforms.filter(function(p){return p.id===id;})[0];}', ctx);
+  vm.runInContext(cut('  function findSitePlatform()', '  function marginClass(percent)'), ctx);
+  return ctx;
+};
+const ctx = make(data);
+const near = (a, b, msg) => assert(Math.abs(a - b) < 1e-9, msg + ' : ' + a + ' ≠ ' + b);
 const site = data.settings.platforms.find(p => /^site/i.test(p.name));
-assert(site, 'profil Site internet absent du Drive');
+assert(site, 'profil Site internet absent');
+const rate = ctx.parseNum(data.settings.socialChargeRate) / 100;
 for (const p of data.products) {
-  const c = ctx.computeRow(p), pr = ctx.parseNum(p.price);
-  const fraisSite = pr * ctx.parseNum(site.percent) / 100 + ctx.parseNum(site.fixed);
-  assert(Math.abs(c.siteMargin - (c.netMargin + c.platformCost - fraisSite)) < 1e-9, p.name);
-  if (p.platformId === site.id) assert(Math.abs(c.siteMargin - c.netMargin) < 1e-9, p.name);
-}
-const sansSite = vm.createContext({ Math, String, isNaN, parseFloat, state: { settings: Object.assign({}, data.settings, { platforms: data.settings.platforms.filter(p => p !== site) }) } });
-vm.runInContext(cut('  function parseNum(v)', '  function formatCurrency(n)'), sansSite);
-vm.runInContext('function findPlatform(id){return state.settings.platforms.filter(function(p){return p.id===id;})[0];}', sansSite);
-vm.runInContext(cut('  function findSitePlatform()', '  function marginClass(percent)'), sansSite);
-assert.equal(sansSite.computeRow(data.products[0]).siteMargin, null);
-const aurore = data.products.find(p => p.name.startsWith('Lampe Aurore M'));
-console.log('OK : marge site. Aurore M : ligne', ctx.computeRow(aurore).netMargin.toFixed(2), '/ site', ctx.computeRow(aurore).siteMargin.toFixed(2));
-const signales = [];
-for (const p of data.products) {
-  const c = ctx.computeRow(p);
+  const c = ctx.computeRow(p), pr = ctx.parseNum(p.price), port = ctx.parseNum(p.shipping);
+  const pl = data.settings.platforms.find(x => x.id === p.platformId);
+  // Port : payé par l'acheteur (hors marge) mais compté dans la base de la commission et de l'URSSAF.
+  near(c.platformCost, (pr + port) * ctx.parseNum(pl.percent) / 100 + ctx.parseNum(pl.fixed), p.name + ' commission');
+  near(c.socialCost, (pr + port) * rate, p.name + ' URSSAF');
+  near(c.netMargin, pr - c.totalCost, p.name + ' marge');
+  const sansPort = ctx.computeRow(Object.assign({}, p, { shipping: '0' }));
+  near(sansPort.netMargin - c.netMargin, port * (ctx.parseNum(pl.percent) / 100 + rate), p.name + ' coût du port');
+  // Marge site : écart avec la marge de la ligne = frais de sa plateforme - frais du site.
+  const fraisSite = (pr + port) * ctx.parseNum(site.percent) / 100 + ctx.parseNum(site.fixed);
+  near(c.siteMargin, c.netMargin + c.platformCost - fraisSite, p.name + ' marge site');
+  if (p.platformId === site.id) near(c.siteMargin, c.netMargin, p.name);
+  // Au prix minimum, la marge vaut exactement la marge cible.
   if (c.minPrice !== null) {
-    assert(c.suggestedPrice >= c.minPrice - 1e-9, p.name);
-    assert(c.suggestedPrice - c.minPrice < 1, p.name);
+    const auMin = ctx.computeRow(Object.assign({}, p, { price: String(c.minPrice) }));
+    near(auMin.netMarginPercent, ctx.parseNum(data.settings.targetMargin), p.name + ' marge au prix min');
+    assert.equal(auMin.belowMin, false);
+    assert(c.suggestedPrice >= c.minPrice - 1e-9 && c.suggestedPrice - c.minPrice < 1, p.name);
     assert.equal(Math.round(c.suggestedPrice * 100) % 100, 90, p.name);
   }
-  assert.equal(c.belowMin, ctx.parseNum(p.price) < c.minPrice - 0.005, p.name);
-  if (c.belowMin) signales.push(p.name.slice(0, 12) + ' ' + c.minPrice.toFixed(2) + ' -> ' + c.suggestedPrice.toFixed(2));
+  assert.equal(c.belowMin, pr < c.minPrice - 0.005, p.name);
 }
-// Cas limites : pile au minimum (pas d'alerte), minimum entier, dénominateur nul.
-const p0 = data.products[0];
-const c0 = ctx.computeRow(p0);
-assert.equal(ctx.computeRow(Object.assign({}, p0, { price: String(c0.minPrice) })).belowMin, false);
+// Vente perso (choix par produit) : ni commission ni URSSAF, port sans effet ; la marge site reste une vente pro.
+for (const p0 of data.products) {
+  const p = Object.assign({}, p0, { platformId: persoPl.id }), c = ctx.computeRow(p);
+  assert.equal(c.platformCost, 0); assert.equal(c.socialCost, 0);
+  near(c.netMargin, ctx.computeRow(Object.assign({}, p, { shipping: '0' })).netMargin, p.name + ' perso');
+  near(c.siteMargin, ctx.computeRow(Object.assign({}, p0, { platformId: site.id })).netMargin, p.name + ' marge site depuis perso');
+}
+// Option vendue en plus : absente du calcul du produit seul ; avec l'option, le prix et les coûts s'ajoutent.
+{
+  const base = data.products[0], pl = data.settings.platforms.find(x => x.id === base.platformId);
+  const avec = Object.assign({}, base, { extras: [{ id: 'o1', name: 'Suspension', weight: '58', time: '2', cost: '0.5', price: '8' }] });
+  const c0 = ctx.computeRow(base), c1 = ctx.computeRow(avec), c2 = ctx.computeRow(Object.assign({}, avec, { withOptions: ['o1'] }));
+  near(c1.netMargin, c0.netMargin, 'option non comptée dans le produit seul');
+  near(c1.minPrice, c0.minPrice, 'prix min inchangé');
+  near(c2.price, ctx.parseNum(base.price) + 8, 'prix avec option');
+  const fail = 1 + ctx.parseNum(data.settings.failureRate) / 100, st = data.settings;
+  const coutOption = 0.058 * ctx.parseNum(base.filamentPrice) * fail + 2 * (ctx.parseNum(st.printerPower) / 1000 * ctx.parseNum(st.kwhPrice) + ctx.parseNum(st.printerPrice) / ctx.parseNum(st.printerLifetime)) * fail + 0.5
+    + 8 * (ctx.parseNum(pl.percent) / 100 + rate);
+  near(c2.netMargin - c0.netMargin, 8 - coutOption, 'marge de l\'option');
+  near(ctx.computeRow(Object.assign({}, avec, { withOptions: 'all' })).netMargin, c2.netMargin, 'toutes les options');
+}
+// Échecs d'impression : pas de majoration sur les pièces achetées (options).
+const opt = data.products.find(p => (p.extras || []).length);
+if (opt) near(ctx.computeRow(opt).totalCost - ctx.computeRow(Object.assign({}, opt, { extras: [] })).totalCost, ctx.parseNum(opt.extras[0].cost), 'coût pièce sans majoration');
+// Saisie négative : comptée comme 0.
+near(ctx.computeRow(Object.assign({}, data.products[0], { weight: '-50' })).materialCost, 0, 'poids négatif');
+// Sans profil « Site » : pas de marge site.
+const sansSite = make({ settings: Object.assign({}, data.settings, { platforms: data.settings.platforms.filter(p => p !== site) }) });
+assert.equal(sansSite.computeRow(data.products[0]).siteMargin, null);
 for (const [m, attendu] of [[10.25, 10.9], [10.9, 10.9], [10.91, 11.9], [7, 7.9]]) {
   let s = Math.floor(m) + 0.9; if (s < m - 1e-9) s += 1;
   assert.equal(s.toFixed(2), attendu.toFixed(2));
 }
 assert(html.includes('data-action="applyMin"') && html.includes('action === "applyMin"') && html.includes('confirm("Passer « '));
-console.log('OK : prix minimum.', signales.length, 'produit(s) signalé(s) :', signales.join(' | ') || 'aucun');
+const signales = data.products.filter(p => ctx.computeRow(p).belowMin).map(p => p.name.slice(0, 14) + ' ' + ctx.computeRow(p).minPrice.toFixed(2) + ' -> ' + ctx.computeRow(p).suggestedPrice.toFixed(2));
+console.log('OK : port, marge site, prix minimum.', signales.length, 'produit(s) sous le minimum :', signales.join(' | ') || 'aucun');

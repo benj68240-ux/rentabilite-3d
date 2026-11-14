@@ -1,63 +1,75 @@
+// Contrôle du cœur du logiciel : node verifier.cjs (aucun fichier externe nécessaire).
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert/strict');
-// RENTA_HTML=v2/index.html node verifier.cjs : même contrôle sur la version 2 (onglets).
 const html = fs.readFileSync(process.env.RENTA_HTML || __dirname + '/index.html', 'utf8');
 for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
 new vm.Script(fs.readFileSync(__dirname + '/sw.js', 'utf8'));
-const code = html.slice(html.indexOf('  var WORKSHOP_FILAMENT_PRICE'), html.indexOf('  // Certains navigateurs mobiles'));
-let stored;
+const cut = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b, i); assert(i >= 0 && j > i, a); return html.slice(i, j); };
+const code = cut('  function parseNum(v)', '  function formatCurrency(n)') + cut('  var WORKSHOP_FILAMENT_PRICE', '  // Certains navigateurs mobiles') +
+  cut('  var EMBASE_PRESETS', '  function findSitePlatform()');
+const fixture = () => JSON.parse(fs.readFileSync(__dirname + '/tests/donnees_exemple.json', 'utf8'));
+let stored, n = 0;
 const context = vm.createContext({
-  uid: () => 'test-id', embaseTitle: (name, type) => name + ' ' + type,
-  STORAGE_KEY: 'test', console, Date, JSON, String,
+  uid: p => p + '_test' + (++n), STORAGE_KEY: 'test', console, Date, JSON, String, Math, Object, Array, isNaN, parseFloat,
   localStorage: {getItem: () => stored || null, setItem: (_, value) => {stored = value;}},
-  hideStorageWarning() {}, showStorageWarning() {}, scheduleDriveUpload() {}, renderBody() {}, openFiche() {}
+  hideStorageWarning() {}, showStorageWarning() {}, scheduleDriveUpload() {}
 });
-vm.runInContext(code, context);
-assert.equal(context.state.products[0].filamentPrice, '15');
-assert.equal(context.state.products[0].packaging, '1.5');
-// Données réelles du Drive (31/10, ancienne base fixe 2 €) : passage unique à 1,5 €, rien d'autre ne change.
-const source = JSON.parse(fs.readFileSync(__dirname + '/donnees_drive_31_10.json', 'utf8').replace(/^﻿/, ''));
+vm.runInContext(code + '\nthis.api = {get state() { return state; }, set state(v) { state = v; syncSnapshot = takeSnapshot(v); }};', context);
+const api = context.api;
+
+// Saisies numériques.
+for (const [v, attendu] of [['1.234,56', 1234.56], ['0,25', 0.25], ['1.5', 1.5], ['1 200', 1200], ['abc', 0], ['', 0], [null, 0]]) assert.equal(context.parseNum(v), attendu, String(v));
+assert.equal(context.nonNeg('-5'), 0);
+assert(context.isValidNumberInput('12,5') && context.isValidNumberInput('') && !context.isValidNumberInput('-5') && !context.isValidNumberInput('abc'));
+
+// État par défaut : nouvelles bases.
+const def = context.defaultState();
+assert.equal(def.products[0].filamentPrice, '15');
+assert.equal(def.products[0].packaging, '1.5');
+assert.equal(def.products[0].shipping, '5');
+assert.equal(def.settings.socialChargeRate, '13,4');
+
+// Chargement d'un ancien fichier : passages uniques, rien d'autre ne change.
+const source = fixture();
 stored = JSON.stringify(source);
 const loaded = context.loadState();
 assert.equal(loaded.products.length, source.products.length);
+const omit = ({name, filamentPrice, packaging, laborTime, shipping, weight, ...rest}) => rest;
 for (let i = 0; i < loaded.products.length; i++) {
-  const p = loaded.products[i], previous = source.products[i];
-  assert.equal(p.filamentPrice, '15'); assert.equal(p.packaging, '1.5');
-  const omit = ({name, filamentPrice, packaging, ...rest}) => rest;
-  assert.deepEqual(omit(p), omit(previous));
-  assert(!/\((P1S|A1)\)$/.test(p.name));
+  assert.equal(loaded.products[i].filamentPrice, '15');
+  assert.deepEqual(omit(loaded.products[i]), omit(source.products[i]));
+  assert(!/\((P1S|A1)\)$/.test(loaded.products[i].name));
 }
+assert.deepEqual(loaded.products.map(p => p.packaging), ['1.5', '1.5', '0,80', '1.5']);   // 2 € -> 1,5 € une fois
+assert.deepEqual(loaded.products.map(p => p.laborTime), ['20', '0', '0', '5']);          // main d'œuvre : plus de 10 min d'office
+assert.deepEqual(loaded.products.map(p => p.shipping), ['5', '5', '5', '0']);            // port 5 € par défaut, 0 saisi conservé
+assert.equal(loaded.products[3].weight, '24.3');                                          // résidu d'arrondi nettoyé
 assert.deepEqual(loaded.sales, source.sales);
-// Cotisations URSSAF : passage unique 12,3 -> 13,4 %, puis la saisie est conservée ; défaut 13,4 %.
-assert.equal(source.settings.socialChargeRate, '12,3');
 assert.equal(loaded.settings.socialChargeRate, '13,4');
-assert.equal(context.defaultState().settings.socialChargeRate, '13,4');
-const taux = context.applyWorkshopProductRules({settings: {socialChargeRate: '14'}, products: [], socialRateBase: '13,4'}, true);
-assert.equal(taux.settings.socialChargeRate, '14');
-// Import / sync Drive d'un fichier ancienne base : même résultat.
-const imported = context.ensureSalesFields(JSON.parse(JSON.stringify(source)));
-assert.deepEqual(imported.products, loaded.products);
-// Saisie de Benjamin : l'emballage est conservé (y compris 2 € après la migration), le filament reste fixe.
-context.state = imported;
-context.state.products[0].filamentPrice = '99';
-context.state.products[0].packaging = '0,80';
-context.state.products[1].packaging = '2';
+// Import / Drive du même fichier : même résultat.
+assert.deepEqual(context.normalizeImported(fixture()).products, loaded.products);
+// Les saisies sont conservées ensuite (emballage, main d'œuvre remise à 0, port à 0, taux URSSAF).
+api.state = loaded;
+api.state.products[0].filamentPrice = '99';
+api.state.products[0].packaging = '2';
+api.state.products[1].laborTime = '10';
+api.state.products[1].shipping = '0';
+api.state.settings.socialChargeRate = '14';
 context.saveState();
-let saved = JSON.parse(stored);
-assert.equal(saved.products[0].filamentPrice, '15');
-assert.equal(saved.products[0].packaging, '0,80');
-assert.equal(saved.products[1].packaging, '2');
-// Rechargement puis nouvel import Drive du fichier enregistré : les saisies restent.
 const reloaded = context.loadState();
-assert.equal(reloaded.products[0].packaging, '0,80');
-assert.equal(reloaded.products[1].packaging, '2');
-const reimported = context.ensureSalesFields(JSON.parse(stored));
-assert.equal(reimported.products[1].packaging, '2');
+assert.equal(reloaded.products[0].filamentPrice, '15');
+assert.equal(reloaded.products[0].packaging, '2');
+assert.equal(reloaded.products[1].laborTime, '10');                                       // 10 min saisies à la main : conservées
+assert.equal(reloaded.products[1].shipping, '0');
+assert.equal(reloaded.settings.socialChargeRate, '14');
+assert(reloaded.products[0].updatedAt && reloaded.products[1].updatedAt && !reloaded.products[2].updatedAt && reloaded.settingsAt);
 // Champ vide -> valeur par défaut.
-const vide = {products: [{name: 'X', packaging: ''}], packagingBase: '1.5'};
+const vide = {products: [{name: 'X', packaging: '', shipping: ''}, {name: 'Y', laborTime: '10'}, {name: 'Z', laborTime: '20'}], packagingBase: '1.5', laborBase: '10'};
 context.applyWorkshopProductRules(vide, true);
 assert.equal(vide.products[0].packaging, '1.5');
+assert.equal(vide.products[0].shipping, '5');
+assert.deepEqual(vide.products.map(p => p.laborTime), ['0', '0', '20']);                 // retrait unique des 10 min posées d'office
 for (const [name, expected] of [
   ['Objet (P1S)', 'Objet'], ['Objet (A1) (copie)', 'Objet (copie)'],
   ['Objet (4 couleurs)', 'Objet (4 couleurs)'], ['Modèle A1', 'Modèle A1']
@@ -66,11 +78,56 @@ for (const [name, expected] of [
   context.applyWorkshopProductRules(sample, true);
   assert.equal(sample.products[0].name, expected);
 }
+// Nouveau produit : valeurs par défaut.
 const marker = 'document.getElementById("btnAddRow").addEventListener("click", function () {';
 const addStart = html.indexOf(marker) + marker.length;
-const addEnd = html.indexOf('\n  });', addStart);
+const addEnd = html.indexOf('    saveState();', addStart);
 vm.runInContext(html.slice(addStart, addEnd), context);
-assert.equal(context.state.products.at(-1).filamentPrice, '15');
-assert.equal(context.state.products.at(-1).packaging, '1.5');
-assert(!/data-field="packaging"[^>]*readonly/.test(html) && !html.includes('emballage 2 € par produit'));
-console.log('OK : syntaxe, chargement, import/Drive, emballage modifiable et conservé, passage unique 2 -> 1,5, filament fixe, nouveaux produits, noms.');
+const nouveau = api.state.products.at(-1);
+assert.deepEqual([nouveau.filamentPrice, nouveau.packaging, nouveau.laborTime, nouveau.shipping], ['15', '1.5', '0', '5']);
+
+// Embase : plus d'ajout automatique, arrondi propre.
+assert(!html.includes('normalizeEmbaseTypes'));
+const lampe = {name: 'Lampe', weight: '49.3', printTime: '3.123611'};
+context.applyEmbaseType(lampe, 'E27');
+assert.deepEqual([lampe.weight, lampe.printTime, lampe.name], ['74.3', '4.123611', 'Lampe + Embase E27']);
+context.applyEmbaseType(lampe, 'NONE');
+assert.deepEqual([lampe.weight, lampe.printTime, lampe.name], ['49.3', '3.123611', 'Lampe']);
+
+// Fusion entre deux appareils partis du même état.
+const base = context.normalizeImported(fixture());
+const clone = o => JSON.parse(JSON.stringify(o));
+const save = (s, at, change) => { api.state = clone(s); change(api.state); context.stampChanges(api.state, at); api.state.savedAt = at; return clone(api.state); };
+const tel = save(base, '2026-11-13T10:00:00.000Z', s => { s.sales.push({id: 'sale_tel', name: 'Vase test', price: 19}); s.products[0].price = '59'; });
+const pc = save(base, '2026-11-13T10:05:00.000Z', s => { s.products[1].price = '9'; s.products = s.products.filter(p => p.id !== 'prod_3'); s.settings.targetMargin = '35'; });
+for (const merged of [context.mergeStates(tel, pc), context.mergeStates(pc, tel)].map(clone)) {
+  assert.deepEqual(merged.products.map(p => p.id), ['prod_1', 'prod_2', 'prod_4']);      // suppression respectée
+  assert.equal(merged.products[0].price, '59');                                          // modif du téléphone gardée
+  assert.equal(merged.products[1].price, '9');                                           // modif du PC gardée
+  assert.deepEqual(merged.sales.map(s => s.id), ['sale_1', 'sale_tel']);                 // vente du téléphone gardée
+  assert.equal(merged.settings.targetMargin, '35');
+}
+assert.equal(context.contentKey(context.mergeStates(tel, pc)), context.contentKey(context.mergeStates(context.mergeStates(tel, pc), pc)));
+// Même produit modifié des deux côtés : la modification la plus récente gagne.
+const tel2 = save(tel, '2026-11-13T10:10:00.000Z', s => { s.products[1].price = '10'; });
+assert.equal(context.mergeStates(pc, tel2).products[1].price, '10');
+
+// Suspension : 12 € seule, 8 € en option sur les lampes Aurore (passage unique).
+const cat = {settings: {platforms: [{id: 'e', name: 'Etsy', percent: '10', fixed: '0'}]}, products: [
+  {id: 'a', name: 'Lampe Aurore S + Embase E27', price: '49', extras: []},
+  {id: 'b', name: 'Lampe Cristal', price: '31'},
+  {id: 's', name: 'Suspension', price: '8', weight: '58', printTime: '2', accessories: '0', extras: [{id: 'x', name: 'Corde', cost: '0.5'}]}]};
+context.normalizeImported(cat);
+assert.equal(cat.products[2].price, '12');
+assert.deepEqual(clone(cat.products[0].extras), [{id: 'extra_suspension_a', name: 'Suspension', weight: '58', time: '2', cost: '0.5', price: '8'}]);
+assert.equal(cat.products[1].extras, undefined);
+cat.products[2].price = '13'; cat.products[0].extras = [];
+context.normalizeImported(cat);
+assert.equal(cat.products[2].price, '13'); assert.equal(cat.products[0].extras.length, 0);   // une seule fois
+// Vente perso : un choix de vente par produit, plus de mode global.
+assert(!html.includes('data-sale-mode') && !html.includes('action === "saleMode"'));
+assert(html.includes('if (platform && platform.perso) { toast("Vente perso : non comptabilisée"); return; }'));
+assert.deepEqual(clone(base.settings.platforms.map(p => [p.name, !!p.perso])), [['Etsy', false], ['Vente perso', true], ['Site internet', false]]);
+assert.equal(base.saleMode, 'pro');
+assert(/origin !== self\.location\.origin\) return;/.test(fs.readFileSync(__dirname + '/sw.js', 'utf8')));
+console.log('OK : syntaxe, saisies, valeurs par défaut (port 5 €, main d\'œuvre 0), passages uniques, embase, fusion entre appareils.');
