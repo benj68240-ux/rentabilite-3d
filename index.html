@@ -92,7 +92,11 @@ nav.tabs button.on { background: var(--accent-bg); color: var(--accent); }
 .chip { border: 1px solid var(--line); background: var(--surface); color: var(--soft); border-radius: 99px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .chip.on { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .liste { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
-.liste .tete, .liste .prod { display: grid; grid-template-columns: minmax(0, 2.6fr) 1fr 1fr 1fr 1.1fr; gap: 10px; align-items: center; padding: 11px 14px; }
+.liste .tete, .liste .prod { display: grid; grid-template-columns: var(--cols, minmax(0, 2.4fr) 0.9fr 1fr 1fr 1fr 1fr); gap: 10px; align-items: center; padding: 11px 14px; }
+/* Marges des 3 variantes (Benjamin, 14/11/2026) : une colonne par plateforme ; cerclée = plateforme du produit. */
+.prod .c-marges { display: contents; }
+.pill.actuelle { box-shadow: 0 0 0 1.5px currentColor; }
+.tete .actuelle { color: var(--text); }
 .liste .tete { font-size: 12px; color: var(--soft); background: var(--surface-2); font-weight: 600; }
 .liste .prod { border-top: 1px solid var(--line); cursor: pointer; }
 .liste .prod:hover { background: var(--surface-2); }
@@ -168,12 +172,13 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
   nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-width: 1px 0 0; z-index: 9; padding: 6px 6px 10px; }
   nav.tabs button { font-size: 12px; padding: 8px 2px; }
   .liste .tete { display: none; }
-  .liste .prod { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom marge" "infos site"; row-gap: 4px; }
-  .prod .c-nom { grid-area: nom; } .prod .c-marge { grid-area: marge; } .prod .c-site { grid-area: site; }
-  .prod .c-prix { grid-area: infos; text-align: left; color: var(--soft); font-size: 13px; padding-left: 28px; }
+  .liste .prod { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom prix" "marges marges"; row-gap: 6px; }
+  .prod .c-nom { grid-area: nom; } .prod .c-prix { grid-area: prix; }
+  .prod .c-marges { grid-area: marges; display: flex; flex-wrap: wrap; gap: 6px; padding-left: 28px; }
+  .prod .c-marges > div { text-align: left; }
+  .prod .c-marges .pill { font-size: 12.5px; }
+  .prod .c-marges .pill::before { content: attr(data-l) " "; font-weight: 400; }
   .prod .c-min { display: none; }
-  .prod .c-marge .pill::before { content: "Marge "; font-weight: 400; }
-  .prod .c-site .pill::before { content: "Site "; font-weight: 400; }
   .champs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .extra { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .extra .e-nom { grid-column: 1 / -1; }
@@ -220,9 +225,8 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
         <option value="">Trier : ordre d'origine</option>
         <option value="name">Trier : nom</option>
         <option value="price">Trier : prix</option>
-        <option value="netMargin">Trier : marge (€)</option>
-        <option value="netMarginPercent">Trier : marge (%)</option>
-        <option value="siteMargin">Trier : marge site</option>
+        <option value="netMargin">Trier : marge (sa plateforme)</option>
+        <option value="netMarginPercent">Trier : marge % (sa plateforme)</option>
         <option value="marginPerHour">Trier : € par heure</option>
         <option value="minPrice">Trier : prix min.</option>
         <option value="totalCost">Trier : coût total</option>
@@ -234,7 +238,7 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
     </div>
     <div class="chips" id="chips"></div>
     <div class="liste">
-      <div class="tete"><div>Produit <span class="soft">(coche pour un total partiel)</span></div><div class="r">Prix</div><div class="r">Marge</div><div class="r">Marge site</div><div class="r">Prix min.</div></div>
+      <div class="tete" id="teteListe"></div>
       <div id="lignes"></div>
     </div>
     <div class="card" id="totaux">
@@ -1076,7 +1080,11 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
     var q = document.getElementById("recherche").value.trim().toLowerCase();
     var rows = state.products
       .filter(function (p) { return (ui.cat === "Tous" || categorie(p) === ui.cat) && String(p.name || "").toLowerCase().indexOf(q) >= 0; })
-      .map(function (p) { return { p: p, c: computeRow(p) }; });
+      .map(function (p) {
+        var m = {};
+        state.settings.platforms.forEach(function (pl) { m[pl.id] = computeWith(p, { platformId: pl.id }); });
+        return { p: p, c: computeRow(p), m: m };
+      });
     var key = ui.sortKey, dir = ui.sortDir;
     if (!key) return rows;
     rows.sort(function (a, b) {
@@ -1084,8 +1092,9 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
         var sa = String(a.p.name || "").toLowerCase(), sb = String(b.p.name || "").toLowerCase();
         return sa < sb ? -dir : sa > sb ? dir : 0;
       }
-      var va = (key === "price" || key === "weight" || key === "printTime") ? parseNum(a.p[key]) : a.c[key];
-      var vb = (key === "price" || key === "weight" || key === "printTime") ? parseNum(b.p[key]) : b.c[key];
+      var plat = key.indexOf("m:") === 0 ? key.slice(2) : null;
+      var va = plat ? (a.m[plat] || {}).netMargin : (key === "price" || key === "weight" || key === "printTime") ? parseNum(a.p[key]) : a.c[key];
+      var vb = plat ? (b.m[plat] || {}).netMargin : (key === "price" || key === "weight" || key === "printTime") ? parseNum(b.p[key]) : b.c[key];
       va = (va === null || va === undefined || isNaN(va)) ? -Infinity : va;
       vb = (vb === null || vb === undefined || isNaN(vb)) ? -Infinity : vb;
       return va === vb ? 0 : (va < vb ? -dir : dir);
@@ -1093,12 +1102,41 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
     return rows;
   }
 
+  // Nom court d'une plateforme pour les colonnes et les pastilles (Etsy / Site / Direct).
+  function shortPlat(pl) {
+    var n = String(pl.name || "");
+    if (/^site/i.test(n)) return "Site";
+    if (/direct/i.test(n)) return "Direct";
+    if (/perso/i.test(n)) return "Perso";
+    return n.length > 12 ? n.slice(0, 11) + "…" : n;
+  }
+  // Une option de tri « marge » par plateforme, placée juste après « marge (€) ».
+  function fillSortOptions() {
+    var tri = document.getElementById("tri");
+    tri.querySelectorAll("option[data-plat]").forEach(function (o) { o.remove(); });
+    var after = tri.querySelector('option[value="netMarginPercent"]');
+    state.settings.platforms.slice().reverse().forEach(function (pl) {
+      var o = document.createElement("option");
+      o.value = "m:" + pl.id; o.setAttribute("data-plat", "1");
+      o.textContent = "Trier : marge " + shortPlat(pl);
+      after.after(o);
+    });
+    var valid = [].some.call(tri.options, function (o) { return o.value === ui.sortKey; });
+    if (!valid) { ui.sortKey = ""; ui.sortDir = 1; saveUi(); }
+  }
+
   function renderList() {
+    fillSortOptions();
+    var plats = state.settings.platforms;
+    var liste = document.querySelector(".liste");
+    liste.style.setProperty("--cols", "minmax(0, 2.4fr) 0.9fr repeat(" + plats.length + ", minmax(0, 1fr)) 1fr");
+    document.getElementById("teteListe").innerHTML = '<div>Produit <span class="soft">(coche pour un total partiel ; marge cerclée = sa plateforme)</span></div><div class="r">Prix</div>' +
+      plats.map(function (pl) { return '<div class="r">Marge ' + escapeHtml(shortPlat(pl)) + "</div>"; }).join("") +
+      '<div class="r" title="Prix minimum pour la marge cible, sur la plateforme du produit">Prix min.</div>';
     document.getElementById("tri").value = ui.sortKey;
     var sens = document.getElementById("triSens");
     sens.textContent = ui.sortDir === 1 ? "↑" : "↓";
     sens.disabled = !ui.sortKey;
-    var hasSite = !!findSitePlatform();
     var rows = sortedRows();
     document.getElementById("lignes").innerHTML = rows.map(function (x) {
       var p = x.p, c = x.c, sel = selectedIds.has(p.id);
@@ -1107,8 +1145,11 @@ details.repli > summary { cursor: pointer; color: var(--soft); font-size: 13px; 
           '<div><div class="nom">' + (c.belowMin ? "⚠ " : "") + escapeHtml(p.name || "Sans nom") + '</div><div class="cat">' + escapeHtml(categorie(p)) + " · " +
           formatNumberPlain(parseNum(p.weight), 0) + " g · " + hm(c.totalPrintTime) + " · " + escapeHtml(platformLabel(p)) + "</div></div></div>" +
         '<div class="r num c-prix">' + formatCurrency(parseNum(p.price)) + "</div>" +
-        '<div class="r c-marge">' + pill(formatCurrency(c.netMargin), marginClass(c.netMarginPercent)) + "</div>" +
-        '<div class="r c-site">' + (hasSite ? pill(formatCurrency(c.siteMargin), marginClass(c.siteMarginPercent)) : '<span class="soft">—</span>') + "</div>" +
+        '<div class="c-marges">' + plats.map(function (pl) {
+          var cm = x.m[pl.id], cur = pl.id === p.platformId;
+          return '<div class="r"><span class="pill ' + marginClass(cm.netMarginPercent) + (cur ? " actuelle" : "") + '" data-l="' + escapeHtml(shortPlat(pl)) + '"' +
+            (cur ? ' title="Plateforme du produit"' : "") + ">" + formatCurrency(cm.netMargin) + "</span></div>";
+        }).join("") + "</div>" +
         '<div class="r num c-min' + (c.belowMin ? " min-bas" : "") + '">' + formatCurrency(c.minPrice) + "</div></div>";
     }).join("") || '<p class="soft vide">' + (state.products.length ? "Aucun produit trouvé." : "Aucun produit. Clique sur « + Produit ».") + "</p>";
   }
